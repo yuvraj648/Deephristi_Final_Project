@@ -9,6 +9,7 @@ import { ArrowLeft, Plus, Trash2, ArrowRight, MapPin, Compass } from 'lucide-rea
 import type { Sample } from '../../domain/types';
 import { StationMapPicker } from '../../components/workflow/StationMapPicker';
 import type { StationData } from '../../components/workflow/StationMapPicker';
+import { getLocalProfile } from '../../services/researcherProfileService';
 
 interface NewExpeditionFormProps {
   onCancel: () => void;
@@ -23,8 +24,13 @@ interface NewExpeditionFormProps {
 }
 
 export const NewExpeditionForm: React.FC<NewExpeditionFormProps> = ({ onCancel, onProceed }) => {
+  const profile = getLocalProfile();
+  const defaultResearcher = profile
+    ? `${profile.full_name}${profile.lab_name ? ` (${profile.lab_name})` : ''}`
+    : 'Dr. Swaminathan Marine Lab';
+
   const [name, setName] = useState('');
-  const [researcher, setResearcher] = useState('Dr. Swaminathan Marine Lab');
+  const [researcher, setResearcher] = useState(defaultResearcher);
   const [region, setRegion] = useState('Eastern Arabian Sea & Malabar Coast');
   const [date, setDate] = useState('2026-03-30');
   const [description, setDescription] = useState('');

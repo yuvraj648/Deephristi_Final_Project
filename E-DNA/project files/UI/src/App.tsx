@@ -34,6 +34,11 @@ import { SiteDetailDrawer } from './components/drawers/SiteDetailDrawer';
 import { ClusterDetailDrawer } from './components/drawers/ClusterDetailDrawer';
 import type { Sample, ASV, Occurrence, Expedition } from './domain/types';
 import { createExpeditionFromUploads } from './services/dataService';
+import {
+  getLocalProfile,
+  setLocalProfile,
+  type ResearcherProfile,
+} from './services/researcherProfileService';
 
 type AppScreen =
   | 'landing'
@@ -51,7 +56,11 @@ const MainAppContent: React.FC = () => {
 
   const [screen, setScreen] = useState<AppScreen>('landing');
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('overview');
-  const [researcherUser, setResearcherUser] = useState<string>('Dr. M. S. Swaminathan Group');
+  const [researcherProfile, setResearcherProfile] = useState<ResearcherProfile | null>(() => getLocalProfile());
+  const [researcherUser, setResearcherUser] = useState<string>(() => {
+    const cached = getLocalProfile();
+    return cached?.full_name || cached?.display_name || cached?.email || 'Dr. M. S. Swaminathan Group';
+  });
 
   // Staged creation workflow state
   const [stagedExpeditionMeta, setStagedExpeditionMeta] = useState<{
@@ -144,8 +153,9 @@ const MainAppContent: React.FC = () => {
   if (screen === 'auth') {
     return (
       <ResearcherLogin
-        onLoginSuccess={(userId) => {
-          if (userId) setResearcherUser(userId);
+        onLoginSuccess={(profile) => {
+          setResearcherProfile(profile);
+          setResearcherUser(profile.full_name || profile.display_name || profile.email);
           setScreen('home');
         }}
         onBackToLanding={() => setScreen('landing')}
@@ -159,9 +169,14 @@ const MainAppContent: React.FC = () => {
       <ResearcherHome
         onOpenExpedition={handleOpenExistingExpedition}
         onNewExpedition={handleStartNewExpedition}
-        onLogout={() => setScreen('landing')}
+        onLogout={() => {
+          setResearcherProfile(null);
+          setLocalProfile(null);
+          setScreen('landing');
+        }}
         onOpenSurveillance={() => setScreen('surveillance')}
-        researcherName={researcherUser}
+        researcherName={researcherProfile?.full_name || researcherUser}
+        researcherProfile={researcherProfile}
       />
     );
   }
