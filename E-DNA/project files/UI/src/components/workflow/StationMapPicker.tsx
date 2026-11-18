@@ -823,7 +823,7 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
             font-family: inherit;
           }
           .leaflet-tile {
-            background-color: #060B13 !important;
+            background-color: transparent !important;
           }
         `}</style>
         <div ref={mapContainerRef} className="w-full h-full z-0 cursor-crosshair" />
