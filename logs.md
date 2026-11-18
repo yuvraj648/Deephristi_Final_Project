@@ -197,3 +197,34 @@ This is the history available in the checkout; it does not establish whether ear
 5. **Run integration tests with safe local configuration:** verify MongoDB/Supabase setup, authentication and role restrictions, upload/persistence round trips, and all service health endpoints.
 6. **Reconcile docs with code:** update port numbers, folder layouts, endpoints, model descriptions, and rate-limit values; distinguish simulated/demo behavior from live inference.
 7. **Validate scientific/model claims:** run reproducible held-out tests and document calibration/limitations before presenting reported model metrics or depth estimates as reliable.
+
+## 11. 2026-11-18 — Dependencies installed and five services started
+
+This is a follow-up to the initial project audit above. The initial statement that no services had been started describes the audit at that time; the startup work below happened afterward.
+
+### Dependency work
+
+- Installed Node dependencies for the E-DNA UI (`E-DNA/project files/UI`) and the Surveillance frontend and API (`SURVEILLANCE/DeepDrishti/frontend` and `SURVEILLANCE/DeepDrishti/backend`). The projects' lockfiles were used where available.
+- Installed E-DNA Python dependencies into the repository-root `.venv`. A first install under `E-DNA/project files/MODELS/.venv` hit Windows' long-path limit while extracting TensorFlow; the working environment is at the shorter root path. The incomplete nested environment may remain on disk.
+- Installed Surveillance AI Python dependencies and `yt-dlp` into `SURVEILLANCE/DeepDrishti/model/.venv`.
+- `npm` was invoked through `npm.cmd` because PowerShell blocked the npm shim. The E-DNA UI install reported that `core-js` and `esbuild` install scripts were not allowed; its dev server nevertheless returned HTTP 200.
+
+### Services and current runtime status
+
+All five local endpoints returned HTTP 200 during the verification on 2026-11-18:
+
+| Part | Service | URL | Observed status |
+| --- | --- | --- | --- |
+| E-DNA | UI | http://127.0.0.1:5173/ | HTTP 200 |
+| E-DNA | FastAPI | http://127.0.0.1:8000/models | HTTP 200; CNN and COI XGBoost ACTIVE, Tara DNABERT-2 ERROR |
+| Surveillance | AI inference (Flask) | http://127.0.0.1:5001/health | HTTP 200; FUNIE, MiDaS and YOLO loaded; CPU device |
+| Surveillance | API | http://127.0.0.1:5003/api/v1/health | HTTP 200; API process reports running |
+| Surveillance | UI | http://127.0.0.1:5175/ | HTTP 200 |
+
+### Known runtime limitations
+
+- Tara DNABERT-2 is registered but does not load. Hugging Face remote-code loading fails because the cached model module cannot find `flash_attn_triton.py`. Its API metadata still includes reported accuracy metrics; those figures are not evidence that this model is currently running.
+- The Surveillance API has no backend `.env`/MongoDB URI configured. Its health endpoint is reachable, but database-backed authentication and persistence are not verified and are expected to require configuration.
+- The Surveillance inference service is running on CPU.
+- No test suite, frontend production build, or model evaluation was run as part of this startup task. Verification was limited to service HTTP responses and reported model health.
+- Dependency installation may have changed generated lockfiles; inspect `git status` before committing. No source model code or weights were intentionally changed.
