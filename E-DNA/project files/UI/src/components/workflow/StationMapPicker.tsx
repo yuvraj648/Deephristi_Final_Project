@@ -25,7 +25,6 @@ import {
   Maximize2,
   Minimize2,
   Anchor,
-  Eye,
 } from 'lucide-react';
 
 export interface StationData {
@@ -251,8 +250,10 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
       subLayerRef.current = newSub;
     }
 
-    // Bring markers to the front
-    markersLayerGroupRef.current?.bringToFront();
+    // Ensure markers remain visible above base tile layer
+    markersLayerGroupRef.current?.eachLayer((layer: any) => {
+      if (typeof layer.setZIndexOffset === 'function') layer.setZIndexOffset(1000);
+    });
   }, [activeLayer]);
 
   // Handle OpenSeaMap Seamarks Nautical Overlay
@@ -275,7 +276,10 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
       }
     }
 
-    markersLayerGroupRef.current?.bringToFront();
+    // Ensure markers remain visible above seamarks overlay
+    markersLayerGroupRef.current?.eachLayer((layer: any) => {
+      if (typeof layer.setZIndexOffset === 'function') layer.setZIndexOffset(1000);
+    });
   }, [showSeamarks]);
 
   // Handle map click for adding or updating stations
