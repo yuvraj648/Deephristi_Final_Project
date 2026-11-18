@@ -145,7 +145,7 @@ const createStationIcon = (number: number, isSelected: boolean) => {
   });
 };
 
-type MapLayerType = 'esriOcean' | 'googleHybrid' | 'esriSatellite' | 'googleRoadmap' | 'osm';
+type MapLayerType = 'noaaGebco' | 'gebcoTopo' | 'googleHybrid' | 'esriSatellite' | 'esriOcean' | 'osm';
 
 interface LayerConfig {
   name: string;
@@ -158,39 +158,51 @@ interface LayerConfig {
 }
 
 const MAP_LAYERS: Record<MapLayerType, LayerConfig> = {
-  esriOcean: {
-    name: 'Esri Ocean & Bathymetry (GEBCO / NOAA)',
-    badge: 'RECOMMENDED',
-    description: 'Detailed continental shelves, undersea ridges, oceanic trenches & GEBCO depth contours',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
+  noaaGebco: {
+    name: 'NOAA NCEI Bathymetric Relief (Official)',
+    badge: 'NOAA NCEI OFFICIAL',
+    description: 'The exact multi-color seafloor depth & hillshaded relief used by NOAA NCEI Bathymetry Map',
+    url: 'https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_basemap_NCEI/MapServer/tile/{z}/{y}/{x}',
     sublayerUrl:
       'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Tiles &copy; Esri, GEBCO, NOAA, National Geographic, DeLorme',
+    attribution: 'Bathymetry &copy; NOAA NCEI, GEBCO, IHO-IOC',
+    maxZoom: 16,
+  },
+  gebcoTopo: {
+    name: 'GEBCO Subsea Topography & Trenches',
+    badge: '3D SEAFLOOR',
+    description: 'High-definition bathymetric relief displaying undersea mountain chains, trenches, and abyssal plains',
+    url: 'https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_2022_Sub_Ice_topo/MapServer/tile/{z}/{y}/{x}',
+    sublayerUrl:
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Bathymetry &copy; GEBCO 2023 Grid, NOAA',
     maxZoom: 16,
   },
   googleHybrid: {
-    name: 'Google Hybrid / Satellite',
-    badge: 'GLOBAL',
-    description: 'Google high-resolution satellite imagery with coastlines and place names',
+    name: 'Google Hybrid / Optical Satellite',
+    badge: 'GLOBAL SATELLITE',
+    description: 'Google high-resolution satellite imagery with geopolitical coastlines, ports, and cities',
     url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
-    attribution: 'Map data &copy; Google',
+    attribution: 'Imagery &copy; Google',
     maxZoom: 20,
   },
   esriSatellite: {
-    name: 'Esri High-Res Reef & Ocean Satellite',
-    badge: 'TRUE COLOR',
-    description: 'Optical satellite showing coral atolls, coastal reefs & shallow turquoise waters',
+    name: 'Esri High-Res Reef & Shallow Ocean',
+    badge: 'TRUE COLOR REEFS',
+    description: 'Optical satellite revealing shallow coral atolls, turquoise lagoons, and coastal bathymetry',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: 'Tiles &copy; Esri, Maxar, Earthstar Geographics',
     maxZoom: 19,
   },
-  googleRoadmap: {
-    name: 'Google Standard Roadmap',
-    badge: 'TERRAIN',
-    description: 'Clean cartographic map with coastline and maritime territory borders',
-    url: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-    attribution: 'Map data &copy; Google',
-    maxZoom: 20,
+  esriOcean: {
+    name: 'Nautical Dark Hydrographic Chart',
+    badge: 'TACTICAL NAVY',
+    description: 'Muted dark hydrographic chart designed for night surveillance and tactical contrast',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
+    sublayerUrl:
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri, GEBCO, NOAA',
+    maxZoom: 16,
   },
   osm: {
     name: 'OpenStreetMap Hydrographic',
@@ -228,7 +240,7 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
   const markersLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const transectPolylineRef = useRef<L.Polyline | null>(null);
 
-  const [activeLayer, setActiveLayer] = useState<MapLayerType>('esriOcean');
+  const [activeLayer, setActiveLayer] = useState<MapLayerType>('noaaGebco');
   const [clickMode, setClickMode] = useState<'update' | 'add'>('update');
   const [liveCursorCoords, setLiveCursorCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [showLayerMenu, setShowLayerMenu] = useState(false);
@@ -326,7 +338,7 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
     if (tileLayerRef.current) map.removeLayer(tileLayerRef.current);
     if (subLayerRef.current) map.removeLayer(subLayerRef.current);
 
-    const layerConfig = MAP_LAYERS[activeLayer] || MAP_LAYERS.esriOcean;
+    const layerConfig = MAP_LAYERS[activeLayer] || MAP_LAYERS.noaaGebco;
 
     // Standard Tile Layer with auto-fallback
     const tileLayer = L.tileLayer(layerConfig.url, {
