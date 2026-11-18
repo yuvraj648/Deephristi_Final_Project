@@ -35,7 +35,12 @@ import { ClusterDetailDrawer } from './components/drawers/ClusterDetailDrawer';
 import type { Sample, ASV, Occurrence, Expedition } from './domain/types';
 import { createExpeditionFromUploads } from './services/dataService';
 
+const HeroPage = React.lazy(() =>
+  import('./pages/HeroPage').then(({ HeroPage: page }) => ({ default: page }))
+);
+
 type AppScreen =
+  | 'hero'
   | 'landing'
   | 'auth'
   | 'home'
@@ -50,7 +55,7 @@ type AppScreen =
 const MainAppContent: React.FC = () => {
   const { expedition, setExpedition, loadExpeditionById } = useAnalysis();
 
-  const [screen, setScreen] = useState<AppScreen>('landing');
+  const [screen, setScreen] = useState<AppScreen>('hero');
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('overview');
   const [researcherUser, setResearcherUser] = useState<string>('Dr. M. S. Swaminathan Group');
   const [researcherAuthMode, setResearcherAuthMode] = useState<'cloud' | 'local'>('local');
@@ -122,7 +127,20 @@ const MainAppContent: React.FC = () => {
     setWorkspaceView('overview');
   };
 
-  // 1. Landing Page
+  if (screen === 'hero') {
+    return (
+      <React.Suspense fallback={<main className="min-h-screen bg-[#04111A]" aria-busy="true" />}>
+        <HeroPage
+          onEnterPlatform={() => {
+            window.scrollTo({ top: 0, behavior: 'auto' });
+            setScreen('landing');
+          }}
+        />
+      </React.Suspense>
+    );
+  }
+
+  // 1. Platform Selection Page
   if (screen === 'landing') {
     return (
       <LandingPage

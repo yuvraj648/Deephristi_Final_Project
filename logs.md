@@ -294,3 +294,25 @@ All five local endpoints returned HTTP 200 during the verification on 2026-11-18
 - The offline Community route was exercised in the browser, including rendering sample posts and opening the composer.
 - Lint and Vite production build passed; the full TypeScript build remains blocked by existing unused-import diagnostics in unrelated analysis pages.
 - The new SQL migration has not been applied to a live Supabase project and could not be executed locally because PostgreSQL/Supabase CLI tools are unavailable. Apply migration 001 first, then 002; cloud operations and multi-researcher RLS behavior remain unverified until tested against Supabase.
+
+## 16. 2026-11-18 - Cinematic landing hero
+
+### Changes
+
+- Added `HeroPage` as the first screen at `/`; its final action opens the existing platform-selection page, preserving the researcher and surveillance flows.
+- Copied the supplied 10-second, 1280×720 exploration video into the UI public assets and generated a compressed poster frame from the video for loading/static fallbacks.
+- Added a sticky, scroll-scrubbed scene driven by GSAP ScrollTrigger, with six narrative beats, a progress indicator, subtle scientific annotations, and the requested platform-entry actions. Video seeks are throttled through animation frames; the video does not autoplay or loop.
+- Added GSAP as a UI dependency for the scroll-driven timeline.
+- Lazy-loaded the hero and GSAP bundle separately from the main application chunk.
+- Labeled depth, coordinates, expedition ID, and sequence status as illustrative rather than live telemetry.
+- Added a short poster-led mode for small/coarse-pointer or low-power devices and for `prefers-reduced-motion`.
+- Updated the browser document title for the new entry experience.
+
+### Validation
+
+- `npm.cmd run lint` passed with existing warnings in unrelated files.
+- `npx.cmd vite build` passed with existing chunk-size and dynamic-import warnings.
+- `npm.cmd run build` remains blocked by the same existing unused imports in `AsvExplorerPage.tsx`, `ComparePage.tsx`, `NoveltyPage.tsx`, and `ReportPage.tsx`; it reported no errors in the new hero code.
+- Browser verified the initial hero, the first scroll transition and video scrubbing, the platform CTA, mobile poster mode, and reduced-motion mode.
+- Vite development server is running at `http://127.0.0.1:5173/`.
+- Installing GSAP reported 13 dependency audit advisories (1 moderate, 12 high); no automatic dependency fixes were applied.
