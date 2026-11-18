@@ -43,7 +43,7 @@ export default {
       fontFamily: {
         serif: ['"IBM Plex Sans"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
         sans: ['"IBM Plex Sans"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-        mono: ['"IBM Plex Mono"', 'monospace'],
+        mono: ['"IBM Plex Sans"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       },
       borderRadius: {
         DEFAULT: '4px',

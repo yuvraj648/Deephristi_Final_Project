@@ -27,6 +27,7 @@ import {
   Cloud,
   HardDrive,
   Compass,
+  Users,
 } from 'lucide-react';
 
 interface ResearcherHomeProps {
@@ -34,6 +35,7 @@ interface ResearcherHomeProps {
   onNewExpedition: () => void;
   onLogout: () => void;
   onOpenSurveillance?: () => void;
+  onOpenCommunity: () => void;
   researcherName?: string;
 }
 
@@ -42,6 +44,7 @@ export const ResearcherHome: React.FC<ResearcherHomeProps> = ({
   onNewExpedition,
   onLogout,
   onOpenSurveillance,
+  onOpenCommunity,
   researcherName = 'Dr. M. S. Swaminathan Group',
 }) => {
   const [expeditions, setExpeditions] = useState<ExpeditionSummaryItem[]>([]);
@@ -132,6 +135,16 @@ export const ResearcherHome: React.FC<ResearcherHomeProps> = ({
               <span>LOCAL BACKEND ACTIVE • Python API</span>
             </div>
           )}
+
+          <button
+            type="button"
+            onClick={onOpenCommunity}
+            className="px-3 py-1.5 bg-paper-raised hover:bg-paper-sunk text-ink border border-rule text-[12px] font-mono uppercase tracking-wider rounded-control transition-colors flex items-center gap-1.5"
+            title="Open the DeepDrishti research community"
+          >
+            <Users size={14} />
+            <span>Community</span>
+          </button>
 
           {onOpenSurveillance && (
             <button

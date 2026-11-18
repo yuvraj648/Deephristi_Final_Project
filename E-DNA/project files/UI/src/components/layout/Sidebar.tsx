@@ -11,8 +11,6 @@ import {
   GitBranch,
   Activity,
   MapPin,
-  Users,
-  Network,
   Sparkles,
   Cpu,
   GitCompare,
@@ -29,7 +27,6 @@ export type WorkspaceView =
   | 'taxonomy'
   | 'biodiversity'
   | 'map'
-  | 'community'
   | 'novelty'
   | 'ai_analysis'
   | 'compare'
@@ -51,7 +48,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, onLogo
     { id: 'taxonomy', label: 'Taxonomy', icon: <GitBranch size={17} strokeWidth={1.5} /> },
     { id: 'biodiversity', label: 'Biodiversity', icon: <Activity size={17} strokeWidth={1.5} /> },
     { id: 'map', label: 'Biodiversity Map', icon: <MapPin size={17} strokeWidth={1.5} /> },
-    { id: 'community', label: 'Community', icon: <Users size={17} strokeWidth={1.5} /> },
     { id: 'novelty', label: 'Novelty', icon: <Sparkles size={17} strokeWidth={1.5} /> },
     { id: 'ai_analysis', label: 'AI Analysis', icon: <Cpu size={17} strokeWidth={1.5} /> },
     { id: 'compare', label: 'Compare', icon: <GitCompare size={17} strokeWidth={1.5} /> },

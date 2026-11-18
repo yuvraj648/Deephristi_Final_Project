@@ -228,3 +228,52 @@ All five local endpoints returned HTTP 200 during the verification on 2026-11-18
 - The Surveillance inference service is running on CPU.
 - No test suite, frontend production build, or model evaluation was run as part of this startup task. Verification was limited to service HTTP responses and reported model health.
 - Dependency installation may have changed generated lockfiles; inspect `git status` before committing. No source model code or weights were intentionally changed.
+
+## 12. 2026-11-18 - Community promoted to researcher-level navigation
+
+### Changes
+
+- Added a Community action to the Researcher Home header and a top-level Community screen that can return to Research Home.
+- Removed Community from the expedition workspace sidebar and stopped rendering it inside the expedition workspace.
+- Detached the Community page from selected-expedition data, including its station selector; station tagging is now free text.
+- Marked seeded posts and interactions as sample content, removed fabricated online indicators and profile-verification claims, and clarified that posts are not persisted.
+- Fixed Community page issues found during validation: unused imports, invalid icon props, and children on a void input element.
+
+### Validation
+
+- `npm.cmd run lint` in `E-DNA/project files/UI`: passed with existing warnings in other pages and shared code.
+- `npx.cmd vite build` in `E-DNA/project files/UI`: passed. Vite reported existing chunk-size and ineffective dynamic-import warnings.
+- `npm.cmd run build` in `E-DNA/project files/UI`: still fails at the repository-wide TypeScript check because of pre-existing unused imports in `AsvExplorerPage.tsx`, `ComparePage.tsx`, `NoveltyPage.tsx`, and `ReportPage.tsx`. The changed Community page has no remaining TypeScript errors.
+
+## 13. 2026-11-18 - Community page visual and interaction polish
+
+### Changes
+
+- Rebuilt the page hierarchy with a clearer responsive header, preview notice, feed controls, and a two-column feed/resources layout.
+- Removed the duplicate highlight cards and invented researcher/trending panels; channel tags and counts now come from the posts shown in the local preview.
+- Removed misleading read totals and the nonfunctional share action, and clarified that preview posts, reactions, and replies are not saved or shared.
+- Reworked the dispatch composer and controls for more consistent spacing, responsive behavior, and accessible labels/states.
+- Corrected the Community JSX wrapper nesting that had collapsed the feed layout.
+
+### Validation
+
+- `npm.cmd run lint` in `E-DNA/project files/UI`: passed; reported existing warnings in unrelated files.
+- `npx.cmd vite build` in `E-DNA/project files/UI`: passed with existing chunk-size and dynamic-import warnings.
+- Browser checked the desktop and mobile layouts, home/community navigation, channel filtering, and adding a post to the temporary preview.
+- `npm.cmd run build` remains blocked by pre-existing unused imports in other analysis pages; no TypeScript errors were reported for `CommunityPage.tsx`.
+
+## 14. Community shared header and typography cleanup
+
+### Changes
+
+- Reused the shared application header on the standalone Community page, with a cross-expedition context instead of selected-expedition metrics.
+- Added Research Home and Surveillance actions to that header, and removed the duplicate oversized hero header from Community.
+- Kept the Community composer, filters, bookmarks, endorsements, and discussions as clearly labeled local-preview interactions.
+- Removed unused Source Serif and IBM Plex Mono downloads; `font-sans`, `font-serif`, and `font-mono` utilities now resolve to IBM Plex Sans for consistent typography throughout the application.
+
+### Validation
+
+- `npm.cmd run lint` passed with existing warnings in unrelated files and shared code.
+- `npx.cmd vite build` passed with existing chunk-size and ineffective dynamic-import warnings.
+- Browser checked Researcher Home → Community, the shared header, adding a dispatch in the local preview, and returning to Research Home.
+- `npm.cmd run build` remains blocked by pre-existing unused imports in `AsvExplorerPage.tsx`, `ComparePage.tsx`, `NoveltyPage.tsx`, and `ReportPage.tsx`; it reported no errors in the changed files.

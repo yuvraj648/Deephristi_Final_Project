@@ -11,12 +11,26 @@ import { Moon, Sun, ArrowLeft, Compass } from 'lucide-react';
 
 interface HeaderProps {
   currentView: string;
-  onNavigate: (view: string) => void;
+  onNavigate?: (view: string) => void;
   onExitWorkspace?: () => void;
+  exitLabel?: string;
+  headerContext?: {
+    title: string;
+    subtitle: string;
+  };
+  showReportButton?: boolean;
   onOpenSurveillance?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onExitWorkspace, onOpenSurveillance }) => {
+export const Header: React.FC<HeaderProps> = ({
+  currentView,
+  onNavigate,
+  onExitWorkspace,
+  exitLabel = 'Expeditions',
+  headerContext,
+  showReportButton = true,
+  onOpenSurveillance,
+}) => {
   const { expedition, kpis, theme, setTheme } = useAnalysis();
 
   const toggleTheme = () => {
@@ -32,7 +46,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onExitW
     <header className="bg-paper-raised border-b border-rule px-6 py-2.5 flex items-center justify-between gap-4 z-20">
       {/* Left: Brand Mark + Back Action */}
       <div className="flex items-center gap-4">
-        {onExitWorkspace ? (
+        {onExitWorkspace && !headerContext ? (
           <button
             type="button"
             onClick={onExitWorkspace}
@@ -40,7 +54,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onExitW
             title="Return to Expedition Selection"
           >
             <ArrowLeft size={15} />
-            <span>Expeditions</span>
+            <span>{exitLabel}</span>
           </button>
         ) : (
           <div className="flex items-center gap-2 border-r border-rule pr-4">
@@ -51,24 +65,44 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onExitW
           </div>
         )}
 
-        {/* Expedition Metadata Breadcrumb */}
-        <div className="flex flex-col">
-          <div className="flex items-center gap-2">
-            <h2 className="font-serif font-medium text-[16px] text-ink leading-tight">
-              {expedition.name}
+        {headerContext && onExitWorkspace && (
+          <button
+            type="button"
+            onClick={onExitWorkspace}
+            className="flex items-center gap-1.5 text-ink-muted hover:text-ink text-[12px] font-mono transition-colors border-r border-rule pr-4"
+            title="Return to Research Home"
+          >
+            <ArrowLeft size={15} />
+            <span>{exitLabel}</span>
+          </button>
+        )}
+
+        {headerContext ? (
+          <div className="flex min-w-0 flex-col">
+            <h2 className="truncate font-medium text-[16px] text-ink leading-tight">
+              {headerContext.title}
             </h2>
-            {expedition.provenance === 'uploaded' && <StatusTag status="uploaded" />}
+            <div className="truncate text-[11px] text-ink-faint">{headerContext.subtitle}</div>
           </div>
-          <div className="flex items-center gap-2 text-[11px] font-mono text-ink-faint">
-            <span>{expedition.region}</span>
-            <span>•</span>
-            <span>{kpis.sampleCount} Samples</span>
-            <span>•</span>
-            <span>{kpis.siteCount} Stations</span>
-            <span>•</span>
-            <span>{depthRangeStr}</span>
+        ) : (
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <h2 className="font-serif font-medium text-[16px] text-ink leading-tight">
+                {expedition.name}
+              </h2>
+              {expedition.provenance === 'uploaded' && <StatusTag status="uploaded" />}
+            </div>
+            <div className="flex items-center gap-2 text-[11px] font-mono text-ink-faint">
+              <span>{expedition.region}</span>
+              <span>•</span>
+              <span>{kpis.sampleCount} Samples</span>
+              <span>•</span>
+              <span>{kpis.siteCount} Stations</span>
+              <span>•</span>
+              <span>{depthRangeStr}</span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Right Controls */}
@@ -94,17 +128,19 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onExitW
         </button>
 
         {/* Quick Report Link */}
-        <button
-          type="button"
-          onClick={() => onNavigate('report')}
-          className={`px-2.5 py-1 text-[12px] font-mono uppercase tracking-wider rounded-control border transition-colors ${
-            currentView === 'report'
-              ? 'bg-survey text-white border-survey'
-              : 'border-rule text-ink hover:bg-paper-sunk'
-          }`}
-        >
-          Report
-        </button>
+        {showReportButton && (
+          <button
+            type="button"
+            onClick={() => onNavigate?.('report')}
+            className={`px-2.5 py-1 text-[12px] font-mono uppercase tracking-wider rounded-control border transition-colors ${
+              currentView === 'report'
+                ? 'bg-survey text-white border-survey'
+                : 'border-rule text-ink hover:bg-paper-sunk'
+            }`}
+          >
+            Report
+          </button>
+        )}
 
         {/* Underwater Surveillance Module 02 Link */}
         {onOpenSurveillance && (

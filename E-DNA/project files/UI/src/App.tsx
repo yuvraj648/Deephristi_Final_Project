@@ -44,6 +44,7 @@ type AppScreen =
   | 'data_config'
   | 'processing'
   | 'workspace'
+  | 'community'
   | 'surveillance';
 
 const MainAppContent: React.FC = () => {
@@ -161,7 +162,17 @@ const MainAppContent: React.FC = () => {
         onNewExpedition={handleStartNewExpedition}
         onLogout={() => setScreen('landing')}
         onOpenSurveillance={() => setScreen('surveillance')}
+        onOpenCommunity={() => setScreen('community')}
         researcherName={researcherUser}
+      />
+    );
+  }
+
+  if (screen === 'community') {
+    return (
+      <CommunityPage
+        onExit={() => setScreen('home')}
+        onOpenSurveillance={() => setScreen('surveillance')}
       />
     );
   }
@@ -251,7 +262,6 @@ const MainAppContent: React.FC = () => {
             {workspaceView === 'taxonomy' && <TaxonomyPage />}
             {workspaceView === 'biodiversity' && <BiodiversityPage />}
             {workspaceView === 'map' && <MapPage />}
-            {workspaceView === 'community' && <CommunityPage />}
             {workspaceView === 'novelty' && <NoveltyPage />}
             {workspaceView === 'ai_analysis' && <AiAnalysisPage />}
             {workspaceView === 'compare' && <ComparePage />}
