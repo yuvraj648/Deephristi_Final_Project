@@ -1,191 +1,175 @@
-# 🛡️ Git Conflict Prevention & Safe Team Workflow Guide
+# 🛡️ Conflict-Free Git Collaboration Guide — DeepDrishti
 
-When multiple teammates work on the **DeepDrishti** codebase at the same time, Git conflicts and push errors can happen if everyone works directly on the `main` branch. 
+When multiple team members work on the project at the same time, **never push directly to `main`**. 
 
-This guide provides the **exact workflow** and **golden rules** to guarantee that team members can work simultaneously on the same or different files **without clashing, losing code, or facing errors**.
-
----
-
-## 🌟 The 4 Golden Rules (Prevents 95% of Conflicts)
-
-1. 🚫 **NEVER write code directly on `main`** — Always create your own feature branch.
-2. 🔄 **Always pull the latest code before starting work** — `git pull origin main`.
-3. 💬 **Quick communication** — If you are going to edit a file (e.g. `App.tsx` or `server.js`), send a 5-second message in your team WhatsApp/group: *"I'm editing server.js for the next hour"*.
-4. 📦 **Commit frequently in small pieces** — Don't wait 3 days to push 50 files. Push 1-2 completed files at a time.
+Instead, **every person creates their own branch**, works independently without disturbing anyone else, pushes their branch to GitHub, and later merges into `main` using a **Pull Request (PR)**.
 
 ---
 
-## 🚀 The Safe Daily Workflow (Follow This Every Time)
+## 💡 The Core Rule: Different Branches, Merged Later
 
 ```
-       [origin/main] ────────────────────────────────────────► (Clean Production)
-             │                                                      ▲
-             ▼                                                      │ (Pull Request Merge)
-       git checkout -b feature/my-task                              │
-             │                                                      │
-             ▼                                                      │
-        Make edits ──► git add . ──► git commit ──► git push ───────┘
+                    ┌─── [Person 1 Branch: yuvraj-ui] ──── (Works independently) ────┐
+                    │                                                                 ▼
+[main branch] ──────┴──────────────────────────────────────────────────────────► [Merged main]
+                    │                                                                 ▲
+                    └─── [Person 2 Branch: asmit-api] ──── (Works independently) ────┘
 ```
+
+- **Person 1** works on their own branch: `yuvraj-ui`
+- **Person 2** works on their own branch: `asmit-api`
+- Both can edit, test, and push to GitHub **at the exact same time without errors or clashing**!
+- Once tested, each person merges their branch into `main` on GitHub with 1 click.
 
 ---
 
-### Step 1: Start from the Latest Code
+## 🚀 Step-by-Step Daily Workflow for Each Person
 
-Before you start writing any new code:
+---
+
+### 🌅 Step 1: Start of the Day (Always Get Latest Code)
+Before writing any new code, ensure your computer has whatever was merged yesterday:
+
 ```cmd
 git checkout main
 git pull origin main
 ```
-*(This ensures your local PC has all the latest changes your teammates pushed).*
 
 ---
 
-### Step 2: Create Your Own Branch
+### 🌿 Step 2: Create YOUR Own Branch
+Create a new branch with your name and what you are building:
 
-Name the branch with your name or the feature you are working on:
+**For Person 1:**
 ```cmd
-git checkout -b feature/yuvraj-metrics-ui
+git checkout -b yuvraj-ui-changes
 ```
-*(Or `feature/asmit-backend-api`, `bugfix/login-contrast`, etc.)*
 
-👉 You are now in your **own safe playground**. Anything you code here **cannot break anyone else's code**, and nobody can break yours!
+**For Person 2:**
+```cmd
+git checkout -b asmit-backend-api
+```
+
+*(The `-b` flag creates the branch and immediately switches you into it).*
+
+> [!TIP]
+> You are now in your own private sandbox! Anything you modify, break, or test here **cannot affect your teammate's code**, and their work cannot affect yours.
 
 ---
 
-### Step 3: Write Code & Test Locally
-
-Make your edits in VS Code or your editor, test that it runs:
+### 💻 Step 3: Write Code & Test Locally
+Open VS Code, modify your files, and test your code (`npm run dev`, `python app.py`, etc.).
+To check what files you changed at any time:
 ```cmd
 git status
 ```
-*(Shows exactly which files you modified).*
 
 ---
 
-### Step 4: Commit Your Changes
-
+### 💾 Step 4: Save (Commit) Your Work Locally
+When your feature or fix is working:
 ```cmd
 git add .
-git commit -m "feat: improve contrast for enhancement lab metrics"
+git commit -m "feat: updated enhancement lab metrics display"
 ```
 
 ---
 
-### Step 5: Sync with Main Before Pushing (Crucial!)
+### ☁️ Step 5: Push YOUR Branch to GitHub
+Do **NOT** push to `main`. Push your own branch name:
 
-While you were coding, your teammate might have pushed something to `main`. To bring their changes into your branch safely without conflicts:
+**Person 1 runs:**
+```cmd
+git push -u origin yuvraj-ui-changes
+```
 
+**Person 2 runs:**
+```cmd
+git push -u origin asmit-backend-api
+```
+
+*(Both pushes will succeed 100% without blocking or rejecting each other!)*
+
+---
+
+### 🤝 Step 6: Merge on GitHub (Pull Request)
+
+Once your branch is pushed:
+1. Go to your repository in your browser:  
+   👉 **[https://github.com/yuvraj648/Deephristi_Final_Project](https://github.com/yuvraj648/Deephristi_Final_Project)**
+2. You will see a yellow banner at the top with a green button: **"Compare & pull request"**.
+3. Click **"Compare & pull request"**.
+4. GitHub checks: ✅ **"Able to merge automatically."**
+5. Click **"Create pull request"**.
+6. Review the changes with your teammate, then click **"Merge pull request"** → **"Confirm merge"**.
+
+🎉 **Your changes are now safely merged into `main`!**
+
+---
+
+### 🔄 Step 7: Ready for the Next Task
+Once your branch is merged on GitHub, return your local CMD to `main` and pull:
+```cmd
+git checkout main
+git pull origin main
+```
+Your local `main` is now completely up to date with all merged work! For your next task, start again from **Step 2**.
+
+---
+
+## ⚠️ Common Questions & Emergency Fixes
+
+### Q1: My teammate merged their branch into `main` while I am still working on mine. How do I get their updates into my branch?
+Inside your branch, run:
 ```cmd
 git pull origin main --rebase
 ```
-
-- If there are **no overlapping lines**: Git automatically combines everything smoothly!
-- If there are overlapping edits: Git will pause and ask you to pick the lines (see Section below).
+Git will smoothly bring in their new code underneath yours!
 
 ---
 
-### Step 6: Push Your Branch to GitHub
-
-```cmd
-git push -u origin feature/yuvraj-metrics-ui
-```
-
----
-
-### Step 7: Merge on GitHub (Pull Request)
-
-1. Open your repository: **https://github.com/yuvraj648/Deephristi_Final_Project**
-2. You will see a yellow banner: **"feature/yuvraj-metrics-ui had recent pushes"** with a green button: **"Compare & pull request"**.
-3. Click **"Compare & pull request"**.
-4. GitHub automatically checks: ✅ **"Able to merge. These branches can be automatically merged."**
-5. Click **"Create pull request"** → Click **"Merge pull request"** → Click **"Confirm merge"**.
-
-🎉 Done! Your code is now cleanly merged into `main` with zero clashes!
-
----
-
-## ⚠️ What To Do In Common Scenarios
-
----
-
-### Scenario A: "Git rejected my push! (non-fast-forward)"
-
-**Why this happened:** Someone else pushed changes to `main` while you were on `main`.
-
-**How to fix in 10 seconds:**
-```cmd
-git pull --rebase origin main
-git push origin main
-```
-
----
-
-### Scenario B: You have unfinished edits and need to pull teammate's updates
-
-**Why this happened:** Git says *"error: Your local changes to the following files would be overwritten by merge"*.
-
-**How to fix:**
+### Q2: I have half-finished code and need to switch branches or pull.
+If Git says *"your local changes would be overwritten"*, do this:
 ```cmd
 git stash
 git pull origin main
 git stash pop
 ```
-*(This safely hides your work, downloads teammate updates, and brings your work back).*
+*(This safely tucks away your half-finished work, updates the repo, and puts your work right back).*
 
 ---
 
-### Scenario C: Two people edited the EXACT same lines in the same file (Merge Conflict)
-
-Git will notify you:
+### Q3: Two people edited the exact same line in the same file.
+When you open the file in VS Code, Git marks the spot:
 ```
-CONFLICT (content): Merge conflict in SURVEILLANCE/DeepDrishti/frontend/src/App.tsx
-Automatic merge failed; fix conflicts and then commit the result.
+<<<<<<< HEAD (Your branch code)
+const port = 5003;
+=======
+const port = 5005;
+>>>>>>> origin/main (Teammate's code)
 ```
+VS Code gives you 3 clickable buttons above it:
+- **Accept Current Change** (keep yours)
+- **Accept Incoming Change** (keep teammate's)
+- **Accept Both Changes** (keep both)
 
-**Don't panic! Here is how to resolve it in 60 seconds:**
-
-1. Open the conflicted file in **VS Code**.
-2. You will see markers created by Git:
-   ```typescript
-   <<<<<<< HEAD (Current Change - Your Code)
-   const theme = "dark-cyan";
-   =======
-   const theme = "ocean-blue";
-   >>>>>>> origin/main (Incoming Change - Teammate's Code)
-   ```
-3. Above that block, VS Code shows 4 clickable buttons:
-   - **Accept Current Change** (Keep your version)
-   - **Accept Incoming Change** (Keep teammate's version)
-   - **Accept Both Changes** (Keep both)
-4. Click the one you and your teammate agree on (or manually edit the lines to combine them).
-5. Delete any remaining `<<<<<<<`, `=======`, `>>>>>>>` markers and save the file.
-6. Tell Git the conflict is resolved:
-   ```cmd
-   git add .
-   git commit -m "fix: resolve merge conflict in App.tsx"
-   git push
-   ```
+Click the option you agree on, save the file, and commit:
+```cmd
+git add .
+git commit -m "fix: resolve conflict"
+git push
+```
 
 ---
 
-## 📋 Emergency Cheatsheet
+## 📋 Quick Command Summary
 
-| Goal | Command |
+| Action | Command |
 | :--- | :--- |
-| **Check where you are & what changed** | `git status` |
-| **Switch to main & get newest code** | `git checkout main` then `git pull origin main` |
-| **Create and jump into a new branch** | `git checkout -b <branch-name>` |
-| **Save your work temporarily** | `git stash` |
-| **Restore saved work** | `git stash pop` |
-| **Discard all local changes in a file** | `git checkout -- <file-path>` |
-| **View branch list** | `git branch` |
-| **Update your feature branch with main** | `git pull origin main --rebase` |
-
----
-
-## 🤝 Golden Team Agreement
-
-To ensure smooth sailing:
-- **Teammate A (eDNA / AI models)**: Focuses on `E-DNA/project files/`
-- **Teammate B (Surveillance UI & Backend)**: Focuses on `SURVEILLANCE/DeepDrishti/`
-- When both need to touch root files or shared configs, notify in chat first!
+| **Get latest updates from main** | `git checkout main` && `git pull origin main` |
+| **Create your own branch** | `git checkout -b <your-name-feature>` |
+| **Check which files you edited** | `git status` |
+| **Save your changes locally** | `git add .` && `git commit -m "your message"` |
+| **Push your branch to GitHub** | `git push -u origin <your-branch-name>` |
+| **Switch back to main** | `git checkout main` |
+| **See all branches** | `git branch` |
