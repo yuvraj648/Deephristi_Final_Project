@@ -1,0 +1,43 @@
+======================================================================
+DEEPDRISHTI - MANUAL CMD LAUNCH COMMANDS (5 SEPARATE TERMINALS)
+======================================================================
+
+Open 5 separate Command Prompt (CMD) windows and run one command in each:
+
+----------------------------------------------------------------------
+[1] eDNA AI Backend API (FastAPI - Port 8000)
+----------------------------------------------------------------------
+cd /d "C:\Users\yuvra\OneDrive\Desktop\DEEP_DRISHTI\E-DNA\project files\MODELS" && python -m uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+
+----------------------------------------------------------------------
+[2] Researcher Hub & Biodiversity UI (Port 5173)
+----------------------------------------------------------------------
+cd /d "C:\Users\yuvra\OneDrive\Desktop\DEEP_DRISHTI\E-DNA\project files\UI" && npm run dev
+
+----------------------------------------------------------------------
+[3] Underwater Surveillance Computer Vision AI (Port 5001)
+----------------------------------------------------------------------
+cd /d "C:\Users\yuvra\OneDrive\Desktop\DEEP_DRISHTI\SURVEILLANCE\DeepDrishti\model" && python app.py
+
+----------------------------------------------------------------------
+[4] Underwater Surveillance Backend API (Port 5003)
+----------------------------------------------------------------------
+cd /d "C:\Users\yuvra\OneDrive\Desktop\DEEP_DRISHTI\SURVEILLANCE\DeepDrishti\backend" && node server/server.js
+
+----------------------------------------------------------------------
+[5] Underwater Surveillance Tactical Console (Port 5175)
+----------------------------------------------------------------------
+cd /d "C:\Users\yuvra\OneDrive\Desktop\DEEP_DRISHTI\SURVEILLANCE\DeepDrishti\frontend" && npm run dev
+
+======================================================================
+ACCESS IN BROWSER:
+======================================================================
+* Researcher Hub:           http://localhost:5173
+  (Click "Continue in Offline Local Mode" or login with asmit01052005@gmail.com / asmit123)
+
+* Tactical Surveillance:    http://localhost:5175
+  (Login: captain@aquascope.com / Captain@123 OR asmit01052005@gmail.com / asmit123)
+
+* eDNA AI Swagger Docs:     http://localhost:8000/docs
+* Surveillance API:         http://localhost:5003
+* Computer Vision AI:       http://localhost:5001

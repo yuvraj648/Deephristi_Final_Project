@@ -1,0 +1,13 @@
+{
+    "sequence_length": 143,
+    "channels": 4,
+    "embedding_dimension": 128,
+    "num_classes": 13,
+    "taxonomy_level": "Phylum",
+    "marker": "18S rRNA V9",
+    "unusual_distance_threshold": 7.783285140991211,
+    "threshold_percentile": 95,
+    "distance_metric": "Euclidean",
+    "training_samples": 932,
+    "test_samples": 233
+}

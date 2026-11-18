@@ -1,0 +1,5 @@
+cd "E-DNA\project files\UI" && npm install
+cd "..\..\..\SURVEILLANCE\DeepDrishti\backend" && npm install
+cd "..\frontend" && npm install
+
+pip install fastapi uvicorn pydantic torch torchvision ultralytics opencv-python flask flask-cors

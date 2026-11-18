@@ -1,0 +1,147 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Oceanic Navy Surveillance Dark Theme (Global Default) */
+  --paper: #060B13;
+  --paper-raised: #0C1522;
+  --paper-sunk: #04080F;
+  --rule: #162638;
+  --rule-strong: #244160;
+  --ink: #F0F6FC;
+  --ink-muted: #94A8BD;
+  --ink-faint: #5B7288;
+  --survey: #0284C7;
+  --survey-hover: #0369A1;
+  --survey-tint: rgba(2, 132, 199, 0.16);
+
+  /* Abyss ink (landing & dark mode) */
+  --abyss-950: #04080F;
+  --abyss-900: #060B13;
+  --abyss-800: #0C1522;
+  --abyss-line: rgba(56, 189, 248, 0.16);
+  --abyss-text: #F0F6FC;
+  --abyss-accent: #38BDF8;
+
+  /* Status tokens */
+  --biological: #10B981;
+  --warning: #F59E0B;
+  --error: #EF4444;
+  --aubergine: #A855F7;
+
+  /* Sequential Ocean Ramp */
+  --ramp-0: #091726;
+  --ramp-1: #0D263E;
+  --ramp-2: #123C5E;
+  --ramp-3: #175482;
+  --ramp-4: #1D73AE;
+  --ramp-5: #0284C7;
+  --ramp-6: #38BDF8;
+
+  /* Base-pair Colors (luminous marine sequencing) */
+  --base-a: #38BDF8;
+  --base-c: #34D399;
+  --base-g: #FBBF24;
+  --base-t: #FB7185;
+  --base-n: #64748B;
+}
+
+.dark-workspace {
+  --paper: #060B13;
+  --paper-raised: #0C1522;
+  --paper-sunk: #04080F;
+  --rule: #162638;
+  --rule-strong: #244160;
+  --ink: #F0F6FC;
+  --ink-muted: #94A8BD;
+  --ink-faint: #5B7288;
+  --survey: #0284C7;
+  --survey-hover: #0369A1;
+  --survey-tint: rgba(2, 132, 199, 0.16);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--ink);
+  background-color: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  letter-spacing: -0.02em;
+}
+
+/* Tabular numerals for data readability */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scientific specimen hatch patterns */
+.hatch-diagonal {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(201, 198, 186, 0.45) 4px,
+    rgba(201, 198, 186, 0.45) 6px
+  );
+}
+
+.hatch-amber {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(183, 121, 31, 0.12),
+    rgba(183, 121, 31, 0.12) 6px,
+    rgba(183, 121, 31, 0.22) 6px,
+    rgba(183, 121, 31, 0.22) 12px
+  );
+}
+
+.hatch-cross {
+  background-image: 
+    repeating-linear-gradient(45deg, rgba(107, 58, 91, 0.2) 0, rgba(107, 58, 91, 0.2) 1px, transparent 0, transparent 5px),
+    repeating-linear-gradient(-45deg, rgba(107, 58, 91, 0.2) 0, rgba(107, 58, 91, 0.2) 1px, transparent 0, transparent 5px);
+}
+
+.hatch-dotted {
+  background-image: radial-gradient(rgba(76, 90, 99, 0.3) 1px, transparent 1px);
+  background-size: 5px 5px;
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--paper-sunk);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--rule-strong);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-muted);
+}
+
+/* Print Styles for Research Reports */
+@media print {
+  body {
+    background-color: #FFFFFF !important;
+    color: #14222B !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}
