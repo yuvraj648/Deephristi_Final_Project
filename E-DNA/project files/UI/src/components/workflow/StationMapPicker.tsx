@@ -145,69 +145,54 @@ const createStationIcon = (number: number, isSelected: boolean) => {
   });
 };
 
-type MapLayerType = 'noaaGebco' | 'gebcoTopo' | 'googleHybrid' | 'esriSatellite' | 'esriOcean' | 'osm';
+type MapLayerType = 'googleHybrid' | 'cartoOcean' | 'googleTerrain' | 'googleRoadmap' | 'osm';
 
 interface LayerConfig {
   name: string;
   badge: string;
   description: string;
   url: string;
-  sublayerUrl?: string;
   attribution: string;
   maxZoom: number;
 }
 
 const MAP_LAYERS: Record<MapLayerType, LayerConfig> = {
-  noaaGebco: {
-    name: 'NOAA NCEI Bathymetric Relief (Official)',
-    badge: 'NOAA NCEI OFFICIAL',
-    description: 'The exact multi-color seafloor depth & hillshaded relief used by NOAA NCEI Bathymetry Map',
-    url: 'https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_basemap_NCEI/MapServer/tile/{z}/{y}/{x}',
-    sublayerUrl:
-      'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Bathymetry &copy; NOAA NCEI, GEBCO, IHO-IOC',
-    maxZoom: 16,
-  },
-  gebcoTopo: {
-    name: 'GEBCO Subsea Topography & Trenches',
-    badge: '3D SEAFLOOR',
-    description: 'High-definition bathymetric relief displaying undersea mountain chains, trenches, and abyssal plains',
-    url: 'https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_2022_Sub_Ice_topo/MapServer/tile/{z}/{y}/{x}',
-    sublayerUrl:
-      'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Bathymetry &copy; GEBCO 2023 Grid, NOAA',
-    maxZoom: 16,
-  },
   googleHybrid: {
-    name: 'Google Hybrid / Optical Satellite',
-    badge: 'GLOBAL SATELLITE',
-    description: 'Google high-resolution satellite imagery with geopolitical coastlines, ports, and cities',
+    name: 'Google Hybrid / High-Res Satellite',
+    badge: 'RECOMMENDED • FAST',
+    description: 'High-resolution true optical satellite with coastlines, coral atolls, ports, and sea names',
     url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
     attribution: 'Imagery &copy; Google',
     maxZoom: 20,
   },
-  esriSatellite: {
-    name: 'Esri High-Res Reef & Shallow Ocean',
-    badge: 'TRUE COLOR REEFS',
-    description: 'Optical satellite revealing shallow coral atolls, turquoise lagoons, and coastal bathymetry',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Tiles &copy; Esri, Maxar, Earthstar Geographics',
+  cartoOcean: {
+    name: 'CartoDB Blue Ocean & Nautical Relief',
+    badge: 'COLORFUL OCEAN',
+    description: 'Vibrant turquoise-blue ocean bathymetry styling with clear shorelines and shelf margins',
+    url: 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+    attribution: '&copy; CartoDB, OpenStreetMap',
     maxZoom: 19,
   },
-  esriOcean: {
-    name: 'Nautical Dark Hydrographic Chart',
-    badge: 'TACTICAL NAVY',
-    description: 'Muted dark hydrographic chart designed for night surveillance and tactical contrast',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
-    sublayerUrl:
-      'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Tiles &copy; Esri, GEBCO, NOAA',
-    maxZoom: 16,
+  googleTerrain: {
+    name: 'Google Physical Ocean & Terrain',
+    badge: 'TERRAIN RELIEF',
+    description: 'Topographic land & coastal bathymetric gradient with elevation contours',
+    url: 'https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
+    attribution: 'Map &copy; Google',
+    maxZoom: 20,
+  },
+  googleRoadmap: {
+    name: 'Google Detailed Coastal Map',
+    badge: 'NAVIGATION',
+    description: 'Clean cartographic map showing maritime boundaries, harbors, and coastal roads',
+    url: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+    attribution: 'Map &copy; Google',
+    maxZoom: 20,
   },
   osm: {
     name: 'OpenStreetMap Hydrographic',
     badge: 'OPEN SOURCE',
-    description: 'Open topographic coastline and nautical water bodies',
+    description: 'Global crowdsourced hydrographic water bodies and navigational coastlines',
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19,
@@ -240,7 +225,7 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
   const markersLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const transectPolylineRef = useRef<L.Polyline | null>(null);
 
-  const [activeLayer, setActiveLayer] = useState<MapLayerType>('noaaGebco');
+  const [activeLayer, setActiveLayer] = useState<MapLayerType>('googleHybrid');
   const [clickMode, setClickMode] = useState<'update' | 'add'>('update');
   const [liveCursorCoords, setLiveCursorCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [showLayerMenu, setShowLayerMenu] = useState(false);
@@ -338,22 +323,14 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
     if (tileLayerRef.current) map.removeLayer(tileLayerRef.current);
     if (subLayerRef.current) map.removeLayer(subLayerRef.current);
 
-    const layerConfig = MAP_LAYERS[activeLayer] || MAP_LAYERS.noaaGebco;
+    const layerConfig = MAP_LAYERS[activeLayer] || MAP_LAYERS.googleHybrid;
 
-    // Standard Tile Layer with auto-fallback
+    // Instant XYZ Tile Layer
     const tileLayer = L.tileLayer(layerConfig.url, {
       attribution: layerConfig.attribution,
       maxZoom: layerConfig.maxZoom,
     }).addTo(map);
     tileLayerRef.current = tileLayer;
-
-    // Sublayer (e.g. ocean depth labels and underwater contours)
-    if (layerConfig.sublayerUrl) {
-      const subLayer = L.tileLayer(layerConfig.sublayerUrl, {
-        maxZoom: layerConfig.maxZoom,
-      }).addTo(map);
-      subLayerRef.current = subLayer;
-    }
 
     // Keep markers above tiles
     markersLayerGroupRef.current?.eachLayer((layer: any) => {
