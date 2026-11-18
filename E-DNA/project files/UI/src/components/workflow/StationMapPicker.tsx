@@ -1,15 +1,17 @@
 // ========================================================
 // DEEPDRISHTI INTERACTIVE HYDROGRAPHIC STATION MAP PICKER
 // Ultra-detailed Nautical & Marine Basemaps:
+// - GEBCO Official Global Shaded Bathymetry (WMS)
 // - Esri Ocean Bathymetry & Undersea Topography (Seafloor ridges & trenches)
-// - Esri World Imagery (High-Res Coral Reefs & Coastlines)
-// - Google Satellite / Hybrid
+// - Esri High-Res Coral Reef & Ocean Optical Satellite
+// - Google Hybrid / Satellite
 // - OpenSeaMap Maritime Seamarks Overlay (Buoys, Channels, Beacons)
-// - Direct Location & Coordinate Search Bar
-// - Expandable Map Canvas (Standard / Expanded 600px)
+// - Interactive Cruise Transect Route & Nautical Mile (NM) Ruler
+// - Marine Oceanographic Zone Telemetry (Epipelagic / Mesopelagic / Bathyal)
+// - One-Click Coordinate Matrix Export (CSV / GeoJSON)
 // ========================================================
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
@@ -25,6 +27,10 @@ import {
   Maximize2,
   Minimize2,
   Anchor,
+  Navigation,
+  Download,
+  Activity,
+  Waves,
 } from 'lucide-react';
 
 export interface StationData {
@@ -43,6 +49,47 @@ interface StationMapPickerProps {
   onAddStationAtCoords: (lat: string, lng: string) => void;
   regionName?: string;
 }
+
+// Haversine formula for Nautical Miles (NM)
+const calculateDistanceNM = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 3440.065; // Earth radius in Nautical Miles
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+// Oceanographic Depth Zone classifier
+const getOceanZone = (depthMeters: number) => {
+  if (depthMeters <= 200) {
+    return {
+      name: 'Epipelagic (Sunlit Shelf)',
+      color: 'text-emerald-400',
+      bg: 'bg-emerald-500/10 border-emerald-500/30',
+      desc: 'Photic zone (0-200m). Coral reef ecosystems, coastal primary productivity, high eDNA richness.',
+    };
+  }
+  if (depthMeters <= 1000) {
+    return {
+      name: 'Mesopelagic (Twilight Zone)',
+      color: 'text-sky-400',
+      bg: 'bg-sky-500/10 border-sky-500/30',
+      desc: 'Dysphotic zone (200-1000m). Steep thermocline, deep scattering layer, cephalopods.',
+    };
+  }
+  return {
+    name: 'Bathyal / Abyssal Basin',
+    color: 'text-indigo-400',
+    bg: 'bg-indigo-500/10 border-indigo-500/30',
+    desc: 'Aphotic midnight zone (>1000m). High hydrostatic pressure, benthic fauna, deep-water cold seeps.',
+  };
+};
 
 // Custom SVG luminous map marker icons
 const createStationIcon = (number: number, isSelected: boolean) => {
@@ -98,13 +145,15 @@ const createStationIcon = (number: number, isSelected: boolean) => {
   });
 };
 
-type MapLayerType = 'esriOcean' | 'esriSatellite' | 'googleHybrid' | 'googleRoadmap' | 'osm';
+type MapLayerType = 'esriOcean' | 'gebcoWms' | 'esriSatellite' | 'googleHybrid' | 'googleRoadmap' | 'osm';
 
 interface LayerConfig {
   name: string;
   badge: string;
   description: string;
+  isWms?: boolean;
   url: string;
+  wmsLayers?: string;
   sublayerUrl?: string;
   attribution: string;
   maxZoom: number;
@@ -113,12 +162,23 @@ interface LayerConfig {
 const MAP_LAYERS: Record<MapLayerType, LayerConfig> = {
   esriOcean: {
     name: 'Esri Ocean & Seafloor Bathymetry',
-    badge: 'RECOMMENDED FOR MARINE',
+    badge: 'RECOMMENDED',
     description: 'Detailed continental shelves, undersea ridges, oceanic trenches & depth contours',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
-    sublayerUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}',
+    sublayerUrl:
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}',
     attribution: 'Tiles &copy; Esri, GEBCO, NOAA, National Geographic, DeLorme',
     maxZoom: 16,
+  },
+  gebcoWms: {
+    name: 'GEBCO Global Shaded Bathymetry',
+    badge: 'SCIENTIFIC WMS',
+    description: 'Official global seafloor bathymetric shaded relief grid with depth color gradients',
+    isWms: true,
+    url: 'https://www.gebco.net/data_and_products/gebco_web_services/web_map_service/mapserv?',
+    wmsLayers: 'GEBCO_LATEST',
+    attribution: 'Bathymetry imagery from GEBCO Compilation Group',
+    maxZoom: 15,
   },
   esriSatellite: {
     name: 'Esri High-Res Reef & Ocean Satellite',
@@ -174,10 +234,11 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | L.TileLayer.WMS | null>(null);
   const subLayerRef = useRef<L.TileLayer | null>(null);
   const seamarkLayerRef = useRef<L.TileLayer | null>(null);
   const markersLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const transectPolylineRef = useRef<L.Polyline | null>(null);
 
   const [activeLayer, setActiveLayer] = useState<MapLayerType>('esriOcean');
   const [clickMode, setClickMode] = useState<'update' | 'add'>('update');
@@ -185,17 +246,59 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
   const [showLayerMenu, setShowLayerMenu] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSeamarks, setShowSeamarks] = useState(true);
+  const [showTransectLine, setShowTransectLine] = useState(true);
 
   // Search input state
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchFeedback, setSearchFeedback] = useState<string | null>(null);
 
+  // Calculate Cruise Transect Statistics
+  const transectStats = useMemo(() => {
+    const validStations = stations
+      .map((st) => ({
+        lat: parseFloat(st.lat),
+        lng: parseFloat(st.lng),
+        depth: parseFloat(st.depth) || 0,
+      }))
+      .filter((s) => !isNaN(s.lat) && !isNaN(s.lng));
+
+    if (validStations.length < 2) {
+      return { totalNM: 0, totalKM: 0, maxDepth: 0, minDepth: 0, count: validStations.length };
+    }
+
+    let totalNM = 0;
+    let maxDepth = -Infinity;
+    let minDepth = Infinity;
+
+    for (let i = 0; i < validStations.length; i++) {
+      if (validStations[i].depth > maxDepth) maxDepth = validStations[i].depth;
+      if (validStations[i].depth < minDepth) minDepth = validStations[i].depth;
+
+      if (i > 0) {
+        totalNM += calculateDistanceNM(
+          validStations[i - 1].lat,
+          validStations[i - 1].lng,
+          validStations[i].lat,
+          validStations[i].lng
+        );
+      }
+    }
+
+    return {
+      totalNM: parseFloat(totalNM.toFixed(1)),
+      totalKM: parseFloat((totalNM * 1.852).toFixed(1)),
+      maxDepth: maxDepth === -Infinity ? 0 : maxDepth,
+      minDepth: minDepth === Infinity ? 0 : minDepth,
+      count: validStations.length,
+    };
+  }, [stations]);
+
   // Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    // Center on Arabian Sea / Indian Ocean
+    // Default center on Arabian Sea / Indian Ocean
     const initialLat = 13.5;
     const initialLng = 72.0;
     const initialZoom = 6;
@@ -226,7 +329,7 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
     };
   }, []);
 
-  // Update Base Layer & Reference Overlay
+  // Update Base Layer & Reference Overlay (handles standard tiles and WMS)
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -236,21 +339,35 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
     if (subLayerRef.current) map.removeLayer(subLayerRef.current);
 
     const layerConfig = MAP_LAYERS[activeLayer];
-    const newBase = L.tileLayer(layerConfig.url, {
-      attribution: layerConfig.attribution,
-      maxZoom: layerConfig.maxZoom,
-    }).addTo(map);
-    tileLayerRef.current = newBase;
 
-    // If layer has an ocean reference sublayer (like bathymetric labels)
-    if (layerConfig.sublayerUrl) {
-      const newSub = L.tileLayer(layerConfig.sublayerUrl, {
+    if (layerConfig.isWms) {
+      // Load Official GEBCO WMS Layer
+      const wmsLayer = L.tileLayer.wms(layerConfig.url, {
+        layers: layerConfig.wmsLayers,
+        format: 'image/png',
+        transparent: true,
+        attribution: layerConfig.attribution,
         maxZoom: layerConfig.maxZoom,
       }).addTo(map);
-      subLayerRef.current = newSub;
+      tileLayerRef.current = wmsLayer;
+    } else {
+      // Standard Tile Layer
+      const tileLayer = L.tileLayer(layerConfig.url, {
+        attribution: layerConfig.attribution,
+        maxZoom: layerConfig.maxZoom,
+      }).addTo(map);
+      tileLayerRef.current = tileLayer;
+
+      // Sublayer (e.g. ocean depth labels and underwater contours)
+      if (layerConfig.sublayerUrl) {
+        const subLayer = L.tileLayer(layerConfig.sublayerUrl, {
+          maxZoom: layerConfig.maxZoom,
+        }).addTo(map);
+        subLayerRef.current = subLayer;
+      }
     }
 
-    // Ensure markers remain visible above base tile layer
+    // Keep markers above tiles
     markersLayerGroupRef.current?.eachLayer((layer: any) => {
       if (typeof layer.setZIndexOffset === 'function') layer.setZIndexOffset(1000);
     });
@@ -276,7 +393,6 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
       }
     }
 
-    // Ensure markers remain visible above seamarks overlay
     markersLayerGroupRef.current?.eachLayer((layer: any) => {
       if (typeof layer.setZIndexOffset === 'function') layer.setZIndexOffset(1000);
     });
@@ -307,7 +423,7 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
     };
   }, [clickMode, selectedStationIndex, stations.length, onAddStationAtCoords, onUpdateStationCoords]);
 
-  // Render markers and keep them in sync with stations array
+  // Render markers and transect line
   useEffect(() => {
     const map = mapInstanceRef.current;
     const markersGroup = markersLayerGroupRef.current;
@@ -315,12 +431,24 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
 
     markersGroup.clearLayers();
 
+    // Remove old transect line
+    if (transectPolylineRef.current) {
+      map.removeLayer(transectPolylineRef.current);
+      transectPolylineRef.current = null;
+    }
+
+    const latLngRoute: [number, number][] = [];
+
     stations.forEach((st, idx) => {
       const lat = parseFloat(st.lat);
       const lng = parseFloat(st.lng);
+      const depthVal = parseFloat(st.depth) || 0;
 
       if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        latLngRoute.push([lat, lng]);
         const isSelected = selectedStationIndex === idx;
+        const zone = getOceanZone(depthVal);
+
         const marker = L.marker([lat, lng], {
           icon: createStationIcon(idx + 1, isSelected),
           draggable: true,
@@ -328,16 +456,17 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
           zIndexOffset: isSelected ? 1000 : 100,
         });
 
-        // Popup content
         const popupContent = `
-          <div style="font-family: monospace; font-size: 12px; color: #060B13; min-width: 180px;">
+          <div style="font-family: monospace; font-size: 12px; color: #060B13; min-width: 200px;">
             <div style="font-weight: 700; color: #0284C7; border-bottom: 1px solid #CBD5E1; padding-bottom: 4px; margin-bottom: 6px;">
               ${st.sampleId}: ${st.site || 'Station ' + (idx + 1)}
             </div>
-            <div><strong>Latitude:</strong> ${lat.toFixed(4)}°N</div>
-            <div><strong>Longitude:</strong> ${lng.toFixed(4)}°E</div>
-            <div><strong>Depth:</strong> ${st.depth || '0'} m</div>
-            <div style="margin-top: 6px; font-size: 10px; color: #64748B;">* Drag pin to fine-tune position</div>
+            <div><strong>Coordinates:</strong> ${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E</div>
+            <div><strong>Depth:</strong> ${depthVal} m</div>
+            <div style="margin-top: 4px; padding: 2px 6px; background: #F1F5F9; border-radius: 4px; font-size: 10px; color: #0369A1; font-weight: bold;">
+              ${zone.name}
+            </div>
+            <div style="margin-top: 6px; font-size: 10px; color: #64748B;">* Drag pin to adjust position</div>
           </div>
         `;
         marker.bindPopup(popupContent);
@@ -354,7 +483,18 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
         markersGroup.addLayer(marker);
       }
     });
-  }, [stations, selectedStationIndex, onSelectStation, onUpdateStationCoords]);
+
+    // Draw cruise transect route connecting stations
+    if (showTransectLine && latLngRoute.length >= 2) {
+      const polyline = L.polyline(latLngRoute, {
+        color: '#38BDF8',
+        weight: 2.5,
+        opacity: 0.85,
+        dashArray: '6, 8',
+      }).addTo(map);
+      transectPolylineRef.current = polyline;
+    }
+  }, [stations, selectedStationIndex, showTransectLine, onSelectStation, onUpdateStationCoords]);
 
   // Recenter map when container size changes
   useEffect(() => {
@@ -396,7 +536,7 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
     setIsSearching(true);
     setSearchFeedback(null);
 
-    // 1. Check if user typed coordinates directly: "15.45, 73.75" or "15.45 73.75"
+    // 1. Direct coordinate format: "15.45, 73.75"
     const coordMatch = searchQuery.match(/^(-?\d+(\.\d+)?)[,\s]+(-?\d+(\.\d+)?)$/);
     if (coordMatch) {
       const lat = parseFloat(coordMatch[1]);
@@ -409,7 +549,7 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
       }
     }
 
-    // 2. Geocode place name using OpenStreetMap Nominatim
+    // 2. Geocode search
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
@@ -433,17 +573,39 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
     }
   };
 
+  // Export Station Coordinates to CSV
+  const handleExportCSV = () => {
+    const csvHeader = 'Sample_ID,Station_Name,Latitude_N,Longitude_E,Depth_m,Ocean_Zone\n';
+    const csvRows = stations
+      .map((s) => {
+        const depthNum = parseFloat(s.depth) || 0;
+        const zone = getOceanZone(depthNum).name;
+        return `"${s.sampleId}","${s.site}","${s.lat}","${s.lng}","${s.depth}","${zone}"`;
+      })
+      .join('\n');
+
+    const blob = new Blob([csvHeader + csvRows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'deepdrishti_sampling_stations.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const activeStation = selectedStationIndex !== null ? stations[selectedStationIndex] : null;
+  const activeStationZone = activeStation ? getOceanZone(parseFloat(activeStation.depth) || 0) : null;
 
   return (
-    <div className="border border-rule rounded-plate overflow-hidden bg-paper-sunk flex flex-col shadow-xl">
+    <div className="border border-rule rounded-plate overflow-hidden bg-paper-sunk flex flex-col shadow-2xl">
       {/* Top Header: Layer Switcher & Mode Toggles */}
       <div className="bg-paper-raised px-4 py-2.5 border-b border-rule flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-survey animate-pulse"></div>
           <span className="font-mono text-[12px] font-semibold text-ink uppercase tracking-wider flex items-center gap-1.5">
             <Compass size={14} className="text-survey" />
-            High-Resolution Marine & Bathymetric Chart
+            Nautical Bathymetric Surveillance Map
           </span>
           <span className="text-[11px] font-mono text-ink-faint">
             ({stations.filter((s) => s.lat && s.lng).length} plotted / {stations.length} stations)
@@ -474,25 +636,40 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
             }`}
           >
             <Crosshair size={12} />
-            <span>+ Click Map to Add New Station</span>
+            <span>+ Click Map to Add Station</span>
           </button>
         </div>
 
-        {/* Right Tools: Seamarks toggle, Layers & Fullscreen */}
+        {/* Right Tools: Seamarks, Transect, Layers, Export & Fullscreen */}
         <div className="flex items-center gap-2">
-          {/* Nautical Seamarks Overlay Toggle */}
+          {/* Transect Line Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowTransectLine(!showTransectLine)}
+            title="Toggle Transect cruise track line connecting stations"
+            className={`px-2 py-1 text-[11px] font-mono rounded-control border flex items-center gap-1 transition-colors ${
+              showTransectLine
+                ? 'bg-survey-tint border-survey text-survey font-semibold'
+                : 'bg-paper border-rule text-ink-muted hover:text-ink'
+            }`}
+          >
+            <Navigation size={12} />
+            <span>Route Line {showTransectLine ? 'ON' : 'OFF'}</span>
+          </button>
+
+          {/* Seamarks Overlay Toggle */}
           <button
             type="button"
             onClick={() => setShowSeamarks(!showSeamarks)}
-            title="Toggle Nautical Navigation Marks, Buoys, Beacons & Marine Depth sounding marks"
-            className={`px-2.5 py-1 text-[11px] font-mono rounded-control border flex items-center gap-1.5 transition-colors ${
+            title="Toggle Nautical Navigation Marks, Buoys, Beacons & Maritime Channels"
+            className={`px-2 py-1 text-[11px] font-mono rounded-control border flex items-center gap-1 transition-colors ${
               showSeamarks
                 ? 'bg-survey-tint border-survey text-survey font-semibold'
                 : 'bg-paper border-rule text-ink-muted hover:text-ink'
             }`}
           >
             <Anchor size={12} />
-            <span>Seamarks & Buoys {showSeamarks ? 'ON' : 'OFF'}</span>
+            <span>Seamarks {showSeamarks ? 'ON' : 'OFF'}</span>
           </button>
 
           {/* Layer Selector */}
@@ -507,9 +684,9 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
             </button>
 
             {showLayerMenu && (
-              <div className="absolute right-0 top-full mt-1.5 z-[1000] bg-paper-raised border border-rule rounded-plate p-2 shadow-2xl min-w-[310px] space-y-1">
+              <div className="absolute right-0 top-full mt-1.5 z-[1000] bg-paper-raised border border-rule rounded-plate p-2 shadow-2xl min-w-[320px] space-y-1">
                 <span className="text-[10px] font-mono uppercase tracking-wider text-ink-faint px-2 block mb-1">
-                  Select Oceanic / Satellite View:
+                  Select Oceanic / Bathymetric Basemap:
                 </span>
                 {(Object.keys(MAP_LAYERS) as MapLayerType[]).map((key) => {
                   const cfg = MAP_LAYERS[key];
@@ -546,6 +723,16 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
             )}
           </div>
 
+          {/* Export CSV */}
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            title="Export station matrix to CSV"
+            className="p-1.5 bg-paper border border-rule hover:border-survey text-ink-muted hover:text-ink rounded-control transition-colors"
+          >
+            <Download size={13} />
+          </button>
+
           {/* Expand / Minimize Canvas Height */}
           <button
             type="button"
@@ -578,7 +765,7 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search ocean region, port, coral reef or 'Lat, Lng'..."
+              placeholder="Search ocean trench, island, port or 'Lat, Lng'..."
               className="w-full bg-paper-raised border border-rule rounded-control pl-8 pr-3 py-1 text-[11px] font-mono text-ink placeholder:text-ink-faint focus:outline-none focus:border-survey shadow-inner"
             />
           </div>
@@ -607,6 +794,35 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
         </div>
       </div>
 
+      {/* Live Transect Route Telemetry Bar */}
+      {transectStats.count >= 2 && (
+        <div className="bg-paper-raised/95 border-b border-rule px-4 py-2 flex flex-wrap items-center justify-between gap-4 text-[11px] font-mono">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5 text-survey font-semibold">
+              <Navigation size={13} />
+              <span>Transect Distance: {transectStats.totalNM} NM ({transectStats.totalKM} km)</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-ink-muted">
+              <Waves size={13} className="text-sky-400" />
+              <span>Depth Range: {transectStats.minDepth}m – {transectStats.maxDepth}m</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-emerald-400">
+              <Activity size={13} />
+              <span>{transectStats.count} Survey Stations Connected</span>
+            </div>
+          </div>
+
+          {activeStation && activeStationZone && (
+            <div className="flex items-center gap-2">
+              <span className="text-ink-faint">Station #{selectedStationIndex! + 1} Zone:</span>
+              <span className={`px-2 py-0.5 rounded border text-[10px] font-semibold ${activeStationZone.bg} ${activeStationZone.color}`}>
+                {activeStationZone.name}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Search Result Feedback Banner */}
       {searchFeedback && (
         <div className="bg-survey-tint px-4 py-1 border-b border-survey/40 text-[11px] font-mono text-survey flex items-center justify-between">
@@ -620,7 +836,7 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
       {/* Map Canvas */}
       <div
         className={`relative w-full bg-[#04080F] transition-all duration-300 ${
-          isExpanded ? 'h-[580px]' : 'h-[440px]'
+          isExpanded ? 'h-[600px]' : 'h-[440px]'
         }`}
       >
         <div ref={mapContainerRef} className="w-full h-full z-0 cursor-crosshair" />
@@ -651,7 +867,7 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
           <span>
             {clickMode === 'update' && activeStation
               ? `Click on water to position Station #${(selectedStationIndex ?? 0) + 1} (${activeStation.sampleId})`
-              : 'Click on the ocean to drop a new sampling station pin'}
+              : 'Click on ocean to drop a new sampling station pin'}
           </span>
         </div>
 
