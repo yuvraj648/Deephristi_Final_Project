@@ -145,7 +145,7 @@ const createStationIcon = (number: number, isSelected: boolean) => {
   });
 };
 
-type MapLayerType = 'googleHybrid' | 'cartoOcean' | 'googleTerrain' | 'googleRoadmap' | 'osm';
+type MapLayerType = 'googleHybrid' | 'googleTerrain' | 'googleSatellite' | 'googleRoadmap' | 'osm';
 
 interface LayerConfig {
   name: string;
@@ -158,27 +158,27 @@ interface LayerConfig {
 
 const MAP_LAYERS: Record<MapLayerType, LayerConfig> = {
   googleHybrid: {
-    name: 'Google Hybrid / High-Res Satellite',
-    badge: 'RECOMMENDED • FAST',
-    description: 'High-resolution true optical satellite with coastlines, coral atolls, ports, and sea names',
+    name: 'Google Hybrid / Optical Satellite',
+    badge: 'DEFAULT • 100% FREE',
+    description: 'High-resolution true optical satellite showing real ocean waters, coral atolls, ports & coastlines',
     url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
     attribution: 'Imagery &copy; Google',
     maxZoom: 20,
   },
-  cartoOcean: {
-    name: 'CartoDB Blue Ocean & Nautical Relief',
-    badge: 'COLORFUL OCEAN',
-    description: 'Vibrant turquoise-blue ocean bathymetry styling with clear shorelines and shelf margins',
-    url: 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-    attribution: '&copy; CartoDB, OpenStreetMap',
-    maxZoom: 19,
-  },
   googleTerrain: {
     name: 'Google Physical Ocean & Terrain',
-    badge: 'TERRAIN RELIEF',
-    description: 'Topographic land & coastal bathymetric gradient with elevation contours',
+    badge: 'RELIEF • 100% FREE',
+    description: 'Shaded topographic land elevation & ocean coastal bathymetry gradients',
     url: 'https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
     attribution: 'Map &copy; Google',
+    maxZoom: 20,
+  },
+  googleSatellite: {
+    name: 'Google Pure Satellite (No Labels)',
+    badge: 'CLEAN SATELLITE',
+    description: 'Unobstructed pure satellite view of the ocean, reefs, and sea surface',
+    url: 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+    attribution: 'Imagery &copy; Google',
     maxZoom: 20,
   },
   googleRoadmap: {
