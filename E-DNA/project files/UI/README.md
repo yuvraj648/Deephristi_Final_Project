@@ -30,3 +30,14 @@ If you are developing a production application, we recommend enabling type-aware
 ```
 
 See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+
+## Supabase Community
+
+The Community feed uses Supabase when a researcher signs in with Supabase. To initialize it:
+
+1. Apply `supabase/migrations/001_initial_schema.sql` to create the researcher and expedition tables.
+2. Apply `supabase/migrations/002_community_schema.sql` to create the Community tables and Row Level Security policies.
+
+The second migration creates `community_posts`, `community_comments`, `community_post_endorsements`, `community_comment_endorsements`, and `community_bookmarks`. Authenticated researchers can read the shared feed; each researcher can write only as themselves, and bookmarks and endorsement identities are private to their owner. Aggregate endorsement counts are returned through authenticated database functions. Existing preview posts are not uploaded or seeded into Supabase.
+
+Supabase sign-in loads and persists Community posts, comments, endorsements, and bookmarks. Choosing Offline Local Mode keeps Community in its temporary, in-memory preview mode.

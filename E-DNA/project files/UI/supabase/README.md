@@ -31,6 +31,9 @@ DeepDrishti maintains strict separation between source scientific observations a
    - `public.asvs`
    - `public.occurrences`
    - Row Level Security (RLS) policies and performance indexes.
+6. Run [`supabase/migrations/002_community_schema.sql`](./migrations/002_community_schema.sql) in a new SQL Editor query to enable the shared Community feature.
+
+The Community migration creates `community_posts`, `community_comments`, `community_post_endorsements`, `community_comment_endorsements`, and `community_bookmarks`. Signed-in researchers share the feed; authors can manage their own content, while bookmarks and endorsement identities are private to their owner. The UI obtains shared endorsement counts through authenticated aggregate functions. Community preview data is not seeded into the database.
 
 ### 3. Configure Authentication (Optional / Recommended)
 1. In the dashboard, navigate to **Authentication** > **Providers** > **Email**.

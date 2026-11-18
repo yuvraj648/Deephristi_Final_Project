@@ -9,7 +9,7 @@ import { ArrowLeft, KeyRound, Cloud, HardDrive, Info } from 'lucide-react';
 import { supabase, isSupabaseConfigured, formatSupabaseError } from '../lib/supabase';
 
 interface ResearcherLoginProps {
-  onLoginSuccess: (researcherId: string) => void;
+  onLoginSuccess: (researcherId: string, mode: 'cloud' | 'local') => void;
   onBackToLanding: () => void;
 }
 
@@ -55,7 +55,7 @@ export const ResearcherLogin: React.FC<ResearcherLoginProps> = ({
           });
           if (signInError) throw signInError;
           if (data.user) {
-            onLoginSuccess(data.user.email || data.user.id);
+            onLoginSuccess(data.user.email || data.user.id, 'cloud');
           }
         }
       } catch (err: any) {
@@ -65,7 +65,7 @@ export const ResearcherLogin: React.FC<ResearcherLoginProps> = ({
       }
     } else {
       // Local Mode
-      onLoginSuccess(email.trim());
+      onLoginSuccess(email.trim(), 'local');
     }
   };
 
@@ -219,7 +219,7 @@ export const ResearcherLogin: React.FC<ResearcherLoginProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => onLoginSuccess(email.trim() || 'researcher-local')}
+                    onClick={() => onLoginSuccess(email.trim() || 'researcher-local', 'local')}
                     className="w-full py-2 px-3 border border-rule hover:border-[#38BDF8]/60 bg-paper-sunk/30 hover:bg-paper-sunk text-ink font-mono text-[11px] rounded-control transition-colors text-ink-muted hover:text-[#38BDF8] text-center flex items-center justify-center gap-2"
                   >
                     <HardDrive size={13} />

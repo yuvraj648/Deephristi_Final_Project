@@ -53,6 +53,7 @@ const MainAppContent: React.FC = () => {
   const [screen, setScreen] = useState<AppScreen>('landing');
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('overview');
   const [researcherUser, setResearcherUser] = useState<string>('Dr. M. S. Swaminathan Group');
+  const [researcherAuthMode, setResearcherAuthMode] = useState<'cloud' | 'local'>('local');
 
   // Staged creation workflow state
   const [stagedExpeditionMeta, setStagedExpeditionMeta] = useState<{
@@ -145,8 +146,9 @@ const MainAppContent: React.FC = () => {
   if (screen === 'auth') {
     return (
       <ResearcherLogin
-        onLoginSuccess={(userId) => {
+        onLoginSuccess={(userId, mode) => {
           if (userId) setResearcherUser(userId);
+          setResearcherAuthMode(mode);
           setScreen('home');
         }}
         onBackToLanding={() => setScreen('landing')}
@@ -173,6 +175,7 @@ const MainAppContent: React.FC = () => {
       <CommunityPage
         onExit={() => setScreen('home')}
         onOpenSurveillance={() => setScreen('surveillance')}
+        persistenceMode={researcherAuthMode}
       />
     );
   }

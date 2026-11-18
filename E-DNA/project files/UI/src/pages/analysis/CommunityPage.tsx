@@ -3,7 +3,7 @@
 // Cross-expedition community view for oceanography research collaboration.
 // ========================================================
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   MessageSquare,
   ThumbsUp,
@@ -21,37 +21,24 @@ import {
   X,
 } from 'lucide-react';
 import { Header } from '../../components/layout/Header';
+import {
+  createCommunityComment,
+  createCommunityPost,
+  getCommunityUser,
+  listCommunityPosts,
+  setCommentEndorsed,
+  setPostBookmarked,
+  setPostEndorsed,
+} from '../../services/communityService';
+import type {
+  CommunityCategory,
+  CommunityComment,
+  CommunityPost,
+} from '../../services/communityService';
 
-interface Comment {
-  id: string;
-  author: string;
-  role: string;
-  affiliation: string;
-  avatar: string;
-  avatarBg: string;
-  timestamp: string;
-  content: string;
-  likes: number;
-  userLiked?: boolean;
-}
+type Comment = CommunityComment;
 
-interface Post {
-  id: string;
-  author: string;
-  role: string;
-  affiliation: string;
-  avatar: string;
-  avatarBg: string;
-  timestamp: string;
-  category: 'discovery' | 'field_log' | 'taxa_query' | 'protocol';
-  title: string;
-  content: string;
-  stationTag?: string;
-  asvTag?: string;
-  channelTag?: string;
-  endorsed: boolean;
-  endorseCount: number;
-  bookmarked: boolean;
+interface Post extends CommunityPost {
   telemetrySnapshot?: {
     label: string;
     value: string;
@@ -68,12 +55,16 @@ interface Post {
 interface CommunityPageProps {
   onExit: () => void;
   onOpenSurveillance?: () => void;
+  persistenceMode: 'cloud' | 'local';
 }
 
-type FeedTab = 'all' | Post['category'];
+type FeedTab = 'all' | 'saved' | Post['category'];
+
+type CommunityMode = 'loading' | 'local' | 'cloud' | 'auth-required' | 'error';
 
 const FEED_TABS: { id: FeedTab; label: string }[] = [
   { id: 'all', label: 'All updates' },
+  { id: 'saved', label: 'Saved' },
   { id: 'discovery', label: 'Discoveries' },
   { id: 'field_log', label: 'Field logs' },
   { id: 'taxa_query', label: 'Taxa queries' },
@@ -87,7 +78,11 @@ const DISPATCH_CATEGORIES: { id: Post['category']; label: string; color: string 
   { id: 'protocol', label: 'Lab protocol', color: 'border-warning text-warning bg-warning/10' },
 ];
 
-export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurveillance }) => {
+export const CommunityPage: React.FC<CommunityPageProps> = ({
+  onExit,
+  onOpenSurveillance,
+  persistenceMode,
+}) => {
 
   // Active filter tab & search
   const [activeTab, setActiveTab] = useState<FeedTab>('all');
@@ -98,13 +93,23 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [composerTitle, setComposerTitle] = useState('');
   const [composerContent, setComposerContent] = useState('');
-  const [composerCategory, setComposerCategory] = useState<'discovery' | 'field_log' | 'taxa_query' | 'protocol'>('discovery');
+  const [composerCategory, setComposerCategory] = useState<CommunityCategory>('discovery');
   const [composerStation, setComposerStation] = useState<string>('');
   const [composerAsv, setComposerAsv] = useState('');
   const [composerTag, setComposerTag] = useState('');
 
   // Toast notification for actions (e.g., share)
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [communityMode, setCommunityMode] = useState<CommunityMode>(
+    persistenceMode === 'local' ? 'local' : 'loading'
+  );
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [feedError, setFeedError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [feedReloadKey, setFeedReloadKey] = useState(0);
+  const [isSavingPost, setIsSavingPost] = useState(false);
+  const [isSavingComment, setIsSavingComment] = useState(false);
+  const [isCloudActionPending, setIsCloudActionPending] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -240,43 +245,132 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
     },
   ]);
 
-  // Handle post creation
-  const handleCreatePost = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!composerContent.trim() && !composerTitle.trim()) return;
+  useEffect(() => {
+    let active = true;
 
-    const newPost: Post = {
-      id: `post-${Date.now()}`,
-      author: 'You',
-      role: 'Researcher',
-      affiliation: 'Local preview',
-      avatar: 'YO',
-      avatarBg: 'bg-survey',
-      timestamp: 'Just now',
-      category: composerCategory,
-      title: composerTitle.trim() || 'Expedition Dispatch & Research Insight',
-      content: composerContent.trim(),
-      stationTag: composerStation || undefined,
-      asvTag: composerAsv || undefined,
-      channelTag: composerTag.startsWith('#') ? composerTag : composerTag ? `#${composerTag}` : '#ArabianSeaExpedition',
-      endorsed: false,
-      endorseCount: 0,
-      bookmarked: false,
-      comments: [],
+    const loadCommunity = async () => {
+      setFeedError(null);
+      setCommunityMode(persistenceMode === 'local' ? 'local' : 'loading');
+
+      try {
+        if (persistenceMode === 'local') {
+          if (active) setCommunityMode('local');
+          return;
+        }
+
+        const user = await getCommunityUser();
+        if (!active) return;
+        if (!user) {
+          setCurrentUserId(null);
+          setCommunityMode('auth-required');
+          return;
+        }
+
+        const communityPosts = await listCommunityPosts();
+        if (!active) return;
+        setCurrentUserId(user.id);
+        setPosts(communityPosts);
+        setCommunityMode('cloud');
+      } catch (error) {
+        if (!active) return;
+        setFeedError(error instanceof Error ? error.message : 'Could not load the community feed.');
+        setCommunityMode('error');
+      }
     };
 
-    setPosts([newPost, ...posts]);
-    setComposerTitle('');
-    setComposerContent('');
-    setComposerStation('');
-    setComposerAsv('');
-    setComposerTag('');
-    setIsComposerOpen(false);
-    showToast('Dispatch added to this local preview.');
+    void loadCommunity();
+    return () => {
+      active = false;
+    };
+  }, [feedReloadKey, persistenceMode]);
+
+  const handleCreatePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const title = composerTitle.trim();
+    const content = composerContent.trim();
+    if (!title || !content) return;
+    setActionError(null);
+
+    const channelTag = composerTag.trim()
+      ? composerTag.trim().startsWith('#')
+        ? composerTag.trim()
+        : `#${composerTag.trim()}`
+      : undefined;
+
+    try {
+      let newPost: Post;
+      if (communityMode === 'cloud') {
+        if (!currentUserId) throw new Error('Your researcher session is no longer available. Sign in again.');
+        setIsSavingPost(true);
+        newPost = await createCommunityPost(currentUserId, {
+          category: composerCategory,
+          title,
+          content,
+          stationTag: composerStation.trim() || undefined,
+          asvTag: composerAsv.trim() || undefined,
+          channelTag,
+        });
+      } else if (communityMode === 'local') {
+        newPost = {
+          id: `post-${Date.now()}`,
+          author: 'You',
+          role: 'Researcher',
+          affiliation: 'Local preview',
+          avatar: 'YO',
+          avatarBg: 'bg-survey',
+          timestamp: 'Just now',
+          category: composerCategory,
+          title,
+          content,
+          stationTag: composerStation.trim() || undefined,
+          asvTag: composerAsv.trim() || undefined,
+          channelTag,
+          endorsed: false,
+          endorseCount: 0,
+          bookmarked: false,
+          comments: [],
+        };
+      } else {
+        throw new Error('The community is not ready to accept posts. Retry loading the feed.');
+      }
+
+      setPosts((previous) => [newPost, ...previous]);
+      setComposerTitle('');
+      setComposerContent('');
+      setComposerStation('');
+      setComposerAsv('');
+      setComposerTag('');
+      setIsComposerOpen(false);
+      showToast(communityMode === 'cloud' ? 'Dispatch published to the community.' : 'Dispatch added to this local preview.');
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not publish the dispatch.');
+    } finally {
+      setIsSavingPost(false);
+    }
   };
 
-  // Toggle Endorse (Like)
-  const handleToggleEndorse = (postId: string) => {
+  const handleToggleEndorse = async (postId: string) => {
+    const post = posts.find((item) => item.id === postId);
+    if (!post) return;
+
+    if (communityMode === 'cloud') {
+      if (!currentUserId) {
+        setActionError('Your researcher session is no longer available. Sign in again.');
+        return;
+      }
+      if (isCloudActionPending) return;
+      setIsCloudActionPending(true);
+      setActionError(null);
+      try {
+        await setPostEndorsed(currentUserId, postId, post.endorsed);
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : 'Could not update the endorsement.');
+        return;
+      } finally {
+        setIsCloudActionPending(false);
+      }
+    }
+
     setPosts((prev) =>
       prev.map((post) => {
         if (post.id === postId) {
@@ -292,17 +386,38 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
     );
   };
 
-  // Toggle Bookmark
-  const handleToggleBookmark = (postId: string) => {
+  const handleToggleBookmark = async (postId: string) => {
+    const post = posts.find((item) => item.id === postId);
+    if (!post) return;
+
+    if (communityMode === 'cloud') {
+      if (!currentUserId) {
+        setActionError('Your researcher session is no longer available. Sign in again.');
+        return;
+      }
+      if (isCloudActionPending) return;
+      setIsCloudActionPending(true);
+      setActionError(null);
+      try {
+        await setPostBookmarked(currentUserId, postId, post.bookmarked);
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : 'Could not update the saved post.');
+        return;
+      } finally {
+        setIsCloudActionPending(false);
+      }
+    }
+
+    const next = !post.bookmarked;
     setPosts((prev) =>
       prev.map((post) => {
-        if (post.id === postId) {
-          const next = !post.bookmarked;
-          showToast(next ? 'Saved for this preview.' : 'Removed from this preview.');
-          return { ...post, bookmarked: next };
-        }
-        return post;
+        return post.id === postId ? { ...post, bookmarked: next } : post;
       })
+    );
+    showToast(
+      next
+        ? communityMode === 'cloud' ? 'Saved to your account.' : 'Saved for this preview.'
+        : communityMode === 'cloud' ? 'Removed from your saved posts.' : 'Removed from this preview.'
     );
   };
 
@@ -314,22 +429,43 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
     }));
   };
 
-  // Add Comment
-  const handleAddComment = (postId: string) => {
+  const handleAddComment = async (postId: string) => {
     const text = (commentInputs[postId] || '').trim();
     if (!text) return;
+    setActionError(null);
 
-    const newComment: Comment = {
-      id: `c-${Date.now()}`,
-      author: 'You',
-      role: 'Researcher',
-      affiliation: 'Local preview',
-      avatar: 'YO',
-      avatarBg: 'bg-survey',
-      timestamp: 'Just now',
-      content: text,
-      likes: 0,
-    };
+    let newComment: Comment;
+    if (communityMode === 'cloud') {
+      if (!currentUserId) {
+        setActionError('Your researcher session is no longer available. Sign in again.');
+        return;
+      }
+      if (isSavingComment) return;
+      setIsSavingComment(true);
+      try {
+        newComment = await createCommunityComment(currentUserId, postId, text);
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : 'Could not submit the response.');
+        return;
+      } finally {
+        setIsSavingComment(false);
+      }
+    } else if (communityMode === 'local') {
+      newComment = {
+        id: `c-${Date.now()}`,
+        author: 'You',
+        role: 'Researcher',
+        affiliation: 'Local preview',
+        avatar: 'YO',
+        avatarBg: 'bg-survey',
+        timestamp: 'Just now',
+        content: text,
+        likes: 0,
+      };
+    } else {
+      setActionError('The community is not ready to accept responses. Retry loading the feed.');
+      return;
+    }
 
     setPosts((prev) =>
       prev.map((post) => {
@@ -345,11 +481,33 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
 
     setCommentInputs((prev) => ({ ...prev, [postId]: '' }));
     setExpandedComments((prev) => ({ ...prev, [postId]: true }));
-    showToast('Response added to this local preview.');
+    showToast(communityMode === 'cloud' ? 'Response shared with the community.' : 'Response added to this local preview.');
   };
 
-  // Like a comment
-  const handleLikeComment = (postId: string, commentId: string) => {
+  const handleLikeComment = async (postId: string, commentId: string) => {
+    const comment = posts
+      .find((post) => post.id === postId)
+      ?.comments.find((item) => item.id === commentId);
+    if (!comment) return;
+
+    if (communityMode === 'cloud') {
+      if (!currentUserId) {
+        setActionError('Your researcher session is no longer available. Sign in again.');
+        return;
+      }
+      if (isCloudActionPending) return;
+      setIsCloudActionPending(true);
+      setActionError(null);
+      try {
+        await setCommentEndorsed(currentUserId, commentId, Boolean(comment.userLiked));
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : 'Could not update the response endorsement.');
+        return;
+      } finally {
+        setIsCloudActionPending(false);
+      }
+    }
+
     setPosts((prev) =>
       prev.map((post) => {
         if (post.id === postId) {
@@ -374,8 +532,11 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
   };
 
   // Filter posts
-  const filteredPosts = posts.filter((post) => {
-    if (activeTab !== 'all' && post.category !== activeTab) return false;
+  const postsReady = communityMode === 'local' || communityMode === 'cloud';
+  const visiblePosts = postsReady ? posts : [];
+  const filteredPosts = visiblePosts.filter((post) => {
+    if (activeTab === 'saved' && !post.bookmarked) return false;
+    if (activeTab !== 'all' && activeTab !== 'saved' && post.category !== activeTab) return false;
     if (activeChannel && post.channelTag !== activeChannel) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -419,6 +580,9 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
     }
   };
 
+  const canPost = communityMode === 'local' || communityMode === 'cloud';
+  const retryCommunityLoad = () => setFeedReloadKey((key) => key + 1);
+
   return (
     <div className="flex min-h-screen flex-col bg-paper font-sans text-ink">
       <Header
@@ -448,7 +612,15 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
                 Research network
               </span>
               <span className="rounded-full border border-rule px-2 py-0.5 text-[11px] text-ink-faint">
-                Local preview
+                {communityMode === 'cloud'
+                  ? 'Shared community'
+                  : communityMode === 'local'
+                    ? 'Local preview'
+                    : communityMode === 'loading'
+                      ? 'Connecting'
+                      : communityMode === 'auth-required'
+                        ? 'Sign-in required'
+                        : 'Unavailable'}
               </span>
             </div>
             <h1 className="text-2xl font-semibold leading-tight text-ink sm:text-3xl">Community</h1>
@@ -458,7 +630,11 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
           </div>
           <button
             type="button"
-            onClick={() => setIsComposerOpen(true)}
+            onClick={() => {
+              setActionError(null);
+              setIsComposerOpen(true);
+            }}
+            disabled={!canPost || isSavingPost}
             className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-control bg-survey px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-survey-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300 sm:self-auto"
           >
             <Send size={15} />
@@ -466,8 +642,32 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
           </button>
         </section>
         <p className="-mt-3 text-xs leading-5 text-ink-faint">
-          Sample posts and interactions are temporary and are not shared with other researchers.
+          {communityMode === 'cloud'
+            ? 'Posts and interactions are saved to Supabase and shared with signed-in researchers.'
+            : communityMode === 'local'
+              ? 'Sample posts and interactions are temporary and are not shared with other researchers.'
+              : communityMode === 'auth-required'
+                ? 'Your Supabase session is missing. Return to Research Home and sign in again.'
+                : communityMode === 'error'
+                  ? 'The shared community could not be loaded.'
+                  : 'Connecting to the shared research community…'}
         </p>
+        {actionError && (
+          <div
+            role="alert"
+            className="flex items-start justify-between gap-3 rounded-plate border border-error/40 bg-error/10 px-4 py-3 text-sm text-error"
+          >
+            <span>{actionError}</span>
+            <button
+              type="button"
+              onClick={() => setActionError(null)}
+              aria-label="Dismiss community error"
+              className="shrink-0 hover:opacity-70"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
         {/* ========================================================
               Community feed
@@ -482,7 +682,11 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
               </div>
               <button
                 type="button"
-                onClick={() => setIsComposerOpen(true)}
+                onClick={() => {
+                  setActionError(null);
+                  setIsComposerOpen(true);
+                }}
+                disabled={!canPost || isSavingPost}
                 className="flex flex-1 items-center justify-between rounded-control border border-rule bg-paper px-4 py-3 text-left text-sm text-ink-muted transition-colors hover:border-rule-strong hover:text-ink"
               >
                 <span>Share an observation, ask a question, or start a discussion...</span>
@@ -494,6 +698,7 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
             <div className="grid grid-cols-4 gap-1 pt-2 border-t border-rule text-[12px] font-mono text-ink-muted">
               <button
                 type="button"
+                disabled={!canPost}
                 onClick={() => {
                   setComposerCategory('discovery');
                   setIsComposerOpen(true);
@@ -505,6 +710,7 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
               </button>
               <button
                 type="button"
+                disabled={!canPost}
                 onClick={() => {
                   setComposerCategory('field_log');
                   setIsComposerOpen(true);
@@ -516,6 +722,7 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
               </button>
               <button
                 type="button"
+                disabled={!canPost}
                 onClick={() => {
                   setComposerCategory('taxa_query');
                   setIsComposerOpen(true);
@@ -527,6 +734,7 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
               </button>
               <button
                 type="button"
+                disabled={!canPost}
                 onClick={() => {
                   setComposerCategory('protocol');
                   setIsComposerOpen(true);
@@ -543,10 +751,18 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
           <div className="flex items-end justify-between gap-4 px-1">
             <div>
               <h2 className="text-lg font-semibold text-ink">Dispatch feed</h2>
-              <p className="mt-1 text-xs text-ink-muted">Browse and filter the sample research posts.</p>
+              <p className="mt-1 text-xs text-ink-muted">
+                {communityMode === 'cloud'
+                  ? 'Browse shared researcher dispatches.'
+                  : 'Browse and filter the sample research posts.'}
+              </p>
             </div>
             <span className="shrink-0 text-xs tabular-nums text-ink-faint">
-              {filteredPosts.length} {filteredPosts.length === 1 ? 'post' : 'posts'}
+              {communityMode === 'loading'
+                ? 'Loading…'
+                : communityMode === 'auth-required' || communityMode === 'error'
+                  ? 'Unavailable'
+                  : `${filteredPosts.length} ${filteredPosts.length === 1 ? 'post' : 'posts'}`}
             </span>
           </div>
 
@@ -594,14 +810,50 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
 
           {/* Posts List */}
           <div className="space-y-4">
-            {filteredPosts.length === 0 ? (
+            {communityMode === 'loading' ? (
+              <div role="status" className="rounded-plate border border-rule bg-paper-raised p-10 text-center text-sm text-ink-muted">
+                Loading community posts…
+              </div>
+            ) : communityMode === 'auth-required' ? (
+              <div role="alert" className="space-y-3 rounded-plate border border-rule bg-paper-raised p-10 text-center">
+                <h4 className="text-lg font-semibold text-ink">Sign in to view the community</h4>
+                <p className="text-sm text-ink-muted">
+                  Shared posts are available only to authenticated researchers.
+                </p>
+                <button
+                  type="button"
+                  onClick={onExit}
+                  className="rounded-control border border-rule px-3.5 py-2 text-sm text-ink hover:bg-paper-sunk"
+                >
+                  Return to Research Home
+                </button>
+              </div>
+            ) : communityMode === 'error' ? (
+              <div role="alert" className="space-y-3 rounded-plate border border-error/40 bg-error/10 p-8 text-center">
+                <h4 className="text-lg font-semibold text-ink">Could not load the community feed</h4>
+                <p className="text-sm text-ink-muted">{feedError}</p>
+                <button
+                  type="button"
+                  onClick={retryCommunityLoad}
+                  className="rounded-control border border-rule px-3.5 py-2 text-sm text-ink hover:bg-paper-sunk"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : filteredPosts.length === 0 ? (
               <div className="bg-paper-raised border border-rule rounded-plate p-10 text-center space-y-3">
                 <MessageSquare size={32} className="mx-auto text-ink-faint" />
                 <h4 className="font-serif font-medium text-[17px] text-ink">
-                  No dispatches found in this category
+                  {communityMode === 'cloud'
+                    ? posts.length === 0
+                      ? 'No community dispatches yet'
+                      : 'No dispatches match these filters'
+                    : 'No dispatches found in this category'}
                 </h4>
                 <p className="text-[12px] font-mono text-ink-muted max-w-md mx-auto">
-                  Try adjusting your search query or clearing the active channel filter.
+                  {communityMode === 'cloud' && posts.length === 0
+                    ? 'Be the first researcher to share an observation or question.'
+                    : 'Try adjusting your search query or clearing the active channel filter.'}
                 </p>
                 <button
                   type="button"
@@ -661,6 +913,7 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
                           <button
                             type="button"
                             onClick={() => handleToggleBookmark(post.id)}
+                            disabled={isCloudActionPending}
                             aria-pressed={post.bookmarked}
                             aria-label={post.bookmarked ? 'Remove bookmark' : 'Save dispatch'}
                             className={`p-1.5 rounded-control transition-colors ${
@@ -755,9 +1008,11 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
                       <div className="flex items-center gap-2">
                         <ThumbsUp size={13} className="text-survey" />
                         <span>
-                          {post.endorseCount > 0
-                            ? `${post.endorseCount} sample reactions`
-                            : 'No sample reactions yet'}
+                          {communityMode === 'cloud'
+                            ? `${post.endorseCount} endorsements`
+                            : post.endorseCount > 0
+                              ? `${post.endorseCount} sample reactions`
+                              : 'No sample reactions yet'}
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
@@ -775,6 +1030,7 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
                       <button
                         type="button"
                         onClick={() => handleToggleEndorse(post.id)}
+                        disabled={isCloudActionPending}
                         aria-pressed={post.endorsed}
                         className={`py-2 rounded-control flex items-center justify-center gap-1.5 transition-colors font-medium ${
                           post.endorsed
@@ -798,6 +1054,7 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
                       <button
                         type="button"
                         onClick={() => handleToggleBookmark(post.id)}
+                        disabled={isCloudActionPending}
                         className={`py-2 rounded-control flex items-center justify-center gap-1.5 transition-colors ${
                           post.bookmarked ? 'text-survey' : 'hover:bg-paper-sunk hover:text-ink'
                         }`}
@@ -818,7 +1075,9 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
                           <div className="flex-1 space-y-2">
                             <input
                               type="text"
+                              maxLength={4000}
                               value={commentInputs[post.id] || ''}
+                              disabled={isSavingComment}
                               onChange={(e) =>
                                 setCommentInputs((prev) => ({ ...prev, [post.id]: e.target.value }))
                               }
@@ -832,10 +1091,10 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
                               <button
                                 type="button"
                                 onClick={() => handleAddComment(post.id)}
-                                disabled={!(commentInputs[post.id] || '').trim()}
+                                disabled={!(commentInputs[post.id] || '').trim() || isSavingComment}
                                 className="px-3.5 py-1 bg-survey hover:bg-survey-hover disabled:opacity-40 text-white text-[11px] font-mono rounded-control font-medium transition-colors"
                               >
-                                Submit Response
+                                {isSavingComment ? 'Submitting…' : 'Submit Response'}
                               </button>
                             </div>
                           </div>
@@ -875,6 +1134,7 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
                                     <button
                                       type="button"
                                       onClick={() => handleLikeComment(post.id, comm.id)}
+                                      disabled={isCloudActionPending}
                                       className={`hover:text-survey flex items-center gap-1 ${
                                         comm.userLiked ? 'text-survey font-semibold' : ''
                                       }`}
@@ -929,10 +1189,10 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
             </div>
             <div className="space-y-1">
               {Array.from(
-                new Set(posts.flatMap((post) => (post.channelTag ? [post.channelTag] : [])))
+                new Set(visiblePosts.flatMap((post) => (post.channelTag ? [post.channelTag] : [])))
               ).map((tag) => {
                 const isActive = activeChannel === tag;
-                const postCount = posts.filter((post) => post.channelTag === tag).length;
+                const postCount = visiblePosts.filter((post) => post.channelTag === tag).length;
                 return (
                   <button
                     key={tag}
@@ -1015,7 +1275,7 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
       </main>
 
       {/* ========================================================
-          Local preview composer
+          Community dispatch composer
           ======================================================== */}
       {isComposerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="presentation">
@@ -1029,7 +1289,7 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
               <div className="flex items-center gap-2">
                 <Send size={18} className="text-survey" />
                 <h3 id="community-composer-title" className="text-lg font-semibold text-ink">
-                  New community dispatch
+                  {communityMode === 'cloud' ? 'New shared dispatch' : 'New community dispatch'}
                 </h3>
               </div>
               <button
@@ -1041,6 +1301,12 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
                 <X size={18} />
               </button>
             </div>
+
+            {actionError && (
+              <div role="alert" className="rounded-control border border-error/40 bg-error/10 px-3 py-2 text-sm text-error">
+                {actionError}
+              </div>
+            )}
 
             <form onSubmit={handleCreatePost} className="space-y-4">
               {/* Category Pills */}
@@ -1073,6 +1339,7 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
                 <input
                   type="text"
                   required
+                  maxLength={200}
                   value={composerTitle}
                   onChange={(e) => setComposerTitle(e.target.value)}
                   placeholder="e.g., Cohesive 14-ASV cluster observed in OMZ core at Station G-14..."
@@ -1088,6 +1355,7 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
                 <textarea
                   rows={6}
                   required
+                  maxLength={10000}
                   value={composerContent}
                   onChange={(e) => setComposerContent(e.target.value)}
                   placeholder="Detail sample collection protocols, amplification metrics, sequence anomalies, or questions for consortium peer review..."
@@ -1102,6 +1370,7 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
                     Tag Station (Optional)
                   </label>
                   <input
+                    maxLength={120}
                     value={composerStation}
                     onChange={(e) => setComposerStation(e.target.value)}
                     placeholder="e.g. Station G-14"
@@ -1115,6 +1384,7 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
                   </label>
                   <input
                     type="text"
+                    maxLength={120}
                     value={composerAsv}
                     onChange={(e) => setComposerAsv(e.target.value)}
                     placeholder="e.g. ASV_IND_04928"
@@ -1128,6 +1398,7 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
                   </label>
                   <input
                     type="text"
+                    maxLength={80}
                     value={composerTag}
                     onChange={(e) => setComposerTag(e.target.value)}
                     placeholder="e.g. #NovelTaxa"
@@ -1139,22 +1410,32 @@ export const CommunityPage: React.FC<CommunityPageProps> = ({ onExit, onOpenSurv
               {/* Footer Buttons */}
               <div className="flex flex-col gap-3 border-t border-rule pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-xs text-ink-faint">
-                  Local preview only; not saved or shared.
+                  {communityMode === 'cloud'
+                    ? 'Published posts are visible to signed-in researchers.'
+                    : 'Local preview only; not saved or shared.'}
                 </span>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setIsComposerOpen(false)}
+                    disabled={isSavingPost}
                     className="rounded-control border border-rule px-4 py-2 text-sm text-ink transition-colors hover:bg-paper-sunk"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
+                    disabled={isSavingPost}
                     className="flex items-center gap-2 rounded-control bg-survey px-5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-survey-hover"
                   >
                     <Send size={13} />
-                    <span>Add to preview</span>
+                    <span>
+                      {isSavingPost
+                        ? 'Publishing…'
+                        : communityMode === 'cloud'
+                          ? 'Publish dispatch'
+                          : 'Add to preview'}
+                    </span>
                   </button>
                 </div>
               </div>

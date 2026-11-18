@@ -277,3 +277,20 @@ All five local endpoints returned HTTP 200 during the verification on 2026-11-18
 - `npx.cmd vite build` passed with existing chunk-size and ineffective dynamic-import warnings.
 - Browser checked Researcher Home → Community, the shared header, adding a dispatch in the local preview, and returning to Research Home.
 - `npm.cmd run build` remains blocked by pre-existing unused imports in `AsvExplorerPage.tsx`, `ComparePage.tsx`, `NoveltyPage.tsx`, and `ReportPage.tsx`; it reported no errors in the changed files.
+
+## 15. 2026-11-18 - Supabase Community persistence
+
+### Changes
+
+- Added `E-DNA/project files/UI/supabase/migrations/002_community_schema.sql` for shared posts, comments, post/comment endorsements, and private bookmarks, with author-scoped Row Level Security.
+- Added authenticated aggregate functions for endorsement counts and the current researcher's own endorsement/bookmark state; individual endorsement identities are not exposed to other researchers.
+- Added `communityService.ts` and connected Community feed loading, publishing, commenting, endorsements, and bookmarks to Supabase.
+- Kept Offline Local Mode separate from Supabase sign-in so its clearly labeled sample feed remains an in-memory preview; cloud mode reads only database posts.
+- Updated the UI login/App flow to tell Community whether the researcher is using Supabase or Offline Local Mode.
+- Added Supabase migration/setup notes to both UI and Supabase README files.
+
+### Validation and setup status
+
+- The offline Community route was exercised in the browser, including rendering sample posts and opening the composer.
+- Lint and Vite production build passed; the full TypeScript build remains blocked by existing unused-import diagnostics in unrelated analysis pages.
+- The new SQL migration has not been applied to a live Supabase project and could not be executed locally because PostgreSQL/Supabase CLI tools are unavailable. Apply migration 001 first, then 002; cloud operations and multi-researcher RLS behavior remain unverified until tested against Supabase.

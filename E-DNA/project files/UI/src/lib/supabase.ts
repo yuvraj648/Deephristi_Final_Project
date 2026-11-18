@@ -106,7 +106,7 @@ export function formatSupabaseError(err: any): string {
     return 'Authentication required. Please sign in to perform this operation.';
   }
   if (lower.includes('row-level security') || lower.includes('permission denied')) {
-    return 'Permission denied. Row-Level Security allows modifications only for your own expeditions.';
+    return 'Permission denied. Row-Level Security rejected this operation for the current researcher account.';
   }
   if (lower.includes('unique constraint') || lower.includes('duplicate key')) {
     return 'Database constraint violation. An expedition, sample, or ASV with this identifier already exists.';
