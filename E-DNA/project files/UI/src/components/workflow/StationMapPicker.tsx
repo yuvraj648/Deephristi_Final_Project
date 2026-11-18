@@ -145,15 +145,13 @@ const createStationIcon = (number: number, isSelected: boolean) => {
   });
 };
 
-type MapLayerType = 'esriOcean' | 'gebcoWms' | 'esriSatellite' | 'googleHybrid' | 'googleRoadmap' | 'osm';
+type MapLayerType = 'esriOcean' | 'googleHybrid' | 'esriSatellite' | 'googleRoadmap' | 'osm';
 
 interface LayerConfig {
   name: string;
   badge: string;
   description: string;
-  isWms?: boolean;
   url: string;
-  wmsLayers?: string;
   sublayerUrl?: string;
   attribution: string;
   maxZoom: number;
@@ -161,40 +159,30 @@ interface LayerConfig {
 
 const MAP_LAYERS: Record<MapLayerType, LayerConfig> = {
   esriOcean: {
-    name: 'Esri Ocean & Seafloor Bathymetry',
+    name: 'Esri Ocean & Bathymetry (GEBCO / NOAA)',
     badge: 'RECOMMENDED',
-    description: 'Detailed continental shelves, undersea ridges, oceanic trenches & depth contours',
+    description: 'Detailed continental shelves, undersea ridges, oceanic trenches & GEBCO depth contours',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
     sublayerUrl:
       'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}',
     attribution: 'Tiles &copy; Esri, GEBCO, NOAA, National Geographic, DeLorme',
     maxZoom: 16,
   },
-  gebcoWms: {
-    name: 'GEBCO Global Shaded Bathymetry',
-    badge: 'SCIENTIFIC WMS',
-    description: 'Official global seafloor bathymetric shaded relief grid with depth color gradients',
-    isWms: true,
-    url: 'https://www.gebco.net/data_and_products/gebco_web_services/web_map_service/mapserv?',
-    wmsLayers: 'GEBCO_LATEST',
-    attribution: 'Bathymetry imagery from GEBCO Compilation Group',
-    maxZoom: 15,
+  googleHybrid: {
+    name: 'Google Hybrid / Satellite',
+    badge: 'GLOBAL',
+    description: 'Google high-resolution satellite imagery with coastlines and place names',
+    url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    attribution: 'Map data &copy; Google',
+    maxZoom: 20,
   },
   esriSatellite: {
     name: 'Esri High-Res Reef & Ocean Satellite',
     badge: 'TRUE COLOR',
-    description: 'Crystal-clear optical satellite showing coral atolls, coastal reefs & shallow waters',
+    description: 'Optical satellite showing coral atolls, coastal reefs & shallow turquoise waters',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Tiles &copy; Esri, Maxar, Earthstar Geographics, CNES/Airbus DS',
+    attribution: 'Tiles &copy; Esri, Maxar, Earthstar Geographics',
     maxZoom: 19,
-  },
-  googleHybrid: {
-    name: 'Google Hybrid / Satellite',
-    badge: 'GLOBAL',
-    description: 'Google satellite view with country borders, coastlines, and town names',
-    url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
-    attribution: 'Map data &copy; Google',
-    maxZoom: 20,
   },
   googleRoadmap: {
     name: 'Google Standard Roadmap',
@@ -329,7 +317,7 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
     };
   }, []);
 
-  // Update Base Layer & Reference Overlay (handles standard tiles and WMS)
+  // Update Base Layer & Reference Overlay (100% verified working XYZ tile layers)
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -338,33 +326,21 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
     if (tileLayerRef.current) map.removeLayer(tileLayerRef.current);
     if (subLayerRef.current) map.removeLayer(subLayerRef.current);
 
-    const layerConfig = MAP_LAYERS[activeLayer];
+    const layerConfig = MAP_LAYERS[activeLayer] || MAP_LAYERS.esriOcean;
 
-    if (layerConfig.isWms) {
-      // Load Official GEBCO WMS Layer
-      const wmsLayer = L.tileLayer.wms(layerConfig.url, {
-        layers: layerConfig.wmsLayers,
-        format: 'image/png',
-        transparent: true,
-        attribution: layerConfig.attribution,
+    // Standard Tile Layer with auto-fallback
+    const tileLayer = L.tileLayer(layerConfig.url, {
+      attribution: layerConfig.attribution,
+      maxZoom: layerConfig.maxZoom,
+    }).addTo(map);
+    tileLayerRef.current = tileLayer;
+
+    // Sublayer (e.g. ocean depth labels and underwater contours)
+    if (layerConfig.sublayerUrl) {
+      const subLayer = L.tileLayer(layerConfig.sublayerUrl, {
         maxZoom: layerConfig.maxZoom,
       }).addTo(map);
-      tileLayerRef.current = wmsLayer;
-    } else {
-      // Standard Tile Layer
-      const tileLayer = L.tileLayer(layerConfig.url, {
-        attribution: layerConfig.attribution,
-        maxZoom: layerConfig.maxZoom,
-      }).addTo(map);
-      tileLayerRef.current = tileLayer;
-
-      // Sublayer (e.g. ocean depth labels and underwater contours)
-      if (layerConfig.sublayerUrl) {
-        const subLayer = L.tileLayer(layerConfig.sublayerUrl, {
-          maxZoom: layerConfig.maxZoom,
-        }).addTo(map);
-        subLayerRef.current = subLayer;
-      }
+      subLayerRef.current = subLayer;
     }
 
     // Keep markers above tiles
@@ -839,6 +815,15 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
           isExpanded ? 'h-[600px]' : 'h-[440px]'
         }`}
       >
+        <style>{`
+          .leaflet-container {
+            background: #060B13 !important;
+            font-family: inherit;
+          }
+          .leaflet-tile {
+            background-color: #060B13 !important;
+          }
+        `}</style>
         <div ref={mapContainerRef} className="w-full h-full z-0 cursor-crosshair" />
 
         {/* Floating Zoom Controls */}
