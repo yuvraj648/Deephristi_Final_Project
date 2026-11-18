@@ -145,13 +145,14 @@ const createStationIcon = (number: number, isSelected: boolean) => {
   });
 };
 
-type MapLayerType = 'googleHybrid' | 'googleTerrain' | 'googleSatellite' | 'googleRoadmap' | 'osm';
+type MapLayerType = 'googleHybrid' | 'noaaGebco' | 'esriOcean' | 'googleTerrain' | 'osm';
 
 interface LayerConfig {
   name: string;
   badge: string;
   description: string;
   url: string;
+  sublayerUrl?: string;
   attribution: string;
   maxZoom: number;
 }
@@ -165,27 +166,31 @@ const MAP_LAYERS: Record<MapLayerType, LayerConfig> = {
     attribution: 'Imagery &copy; Google',
     maxZoom: 20,
   },
+  noaaGebco: {
+    name: 'NOAA NCEI Bathymetric Relief (Official Portal)',
+    badge: 'NOAA NCEI • 100% FREE',
+    description: 'Official multi-color bathymetric depth relief used by the NOAA NCEI Bathymetry Map portal',
+    url: 'https://tiles.arcgis.com/tiles/C8EMgrsFcRFL6LrL/arcgis/rest/services/GEBCO_basemap_NCEI/MapServer/tile/{z}/{y}/{x}',
+    sublayerUrl:
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Bathymetry &copy; NOAA NCEI, GEBCO',
+    maxZoom: 16,
+  },
+  esriOcean: {
+    name: 'Nautical Dark Hydrographic Chart (Tactical Navy)',
+    badge: 'TACTICAL NAVY • 100% FREE',
+    description: 'Muted dark hydrographic chart designed for underwater surveillance with seamount & trench labels',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
+    sublayerUrl:
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri, GEBCO, NOAA',
+    maxZoom: 16,
+  },
   googleTerrain: {
     name: 'Google Physical Ocean & Terrain',
     badge: 'RELIEF • 100% FREE',
-    description: 'Shaded topographic land elevation & ocean coastal bathymetry gradients',
+    description: 'Topographic land elevation & ocean coastal bathymetry depth gradients',
     url: 'https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
-    attribution: 'Map &copy; Google',
-    maxZoom: 20,
-  },
-  googleSatellite: {
-    name: 'Google Pure Satellite (No Labels)',
-    badge: 'CLEAN SATELLITE',
-    description: 'Unobstructed pure satellite view of the ocean, reefs, and sea surface',
-    url: 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-    attribution: 'Imagery &copy; Google',
-    maxZoom: 20,
-  },
-  googleRoadmap: {
-    name: 'Google Detailed Coastal Map',
-    badge: 'NAVIGATION',
-    description: 'Clean cartographic map showing maritime boundaries, harbors, and coastal roads',
-    url: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
     attribution: 'Map &copy; Google',
     maxZoom: 20,
   },
@@ -331,6 +336,14 @@ export const StationMapPicker: React.FC<StationMapPickerProps> = ({
       maxZoom: layerConfig.maxZoom,
     }).addTo(map);
     tileLayerRef.current = tileLayer;
+
+    // Sublayer for ocean depth labels and undersea contours when available
+    if (layerConfig.sublayerUrl) {
+      const subLayer = L.tileLayer(layerConfig.sublayerUrl, {
+        maxZoom: layerConfig.maxZoom,
+      }).addTo(map);
+      subLayerRef.current = subLayer;
+    }
 
     // Keep markers above tiles
     markersLayerGroupRef.current?.eachLayer((layer: any) => {
