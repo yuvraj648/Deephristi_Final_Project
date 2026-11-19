@@ -79,6 +79,7 @@ const MainAppContent: React.FC = () => {
     occurrences: Occurrence[];
     samples: Sample[];
     abundanceSampleIds?: string[];
+    isFastqUpload?: boolean;
   } | null>(null);
 
   const [stagedExpeditionToSave, setStagedExpeditionToSave] = useState<Expedition | null>(null);
@@ -101,6 +102,7 @@ const MainAppContent: React.FC = () => {
       occurrences: bio.occurrences,
       samples: bio.samples,
       abundanceSampleIds: bio.abundanceSampleIds,
+      isFastqUpload: bio.isFastqUpload,
     });
     setScreen('data_config');
   };
@@ -221,7 +223,7 @@ const MainAppContent: React.FC = () => {
   if (screen === 'processing') {
     return (
       <ProcessingPipeline
-        isAsvData={true}
+        isAsvData={!stagedBioData?.isFastqUpload}
         isDemoMode={!stagedExpeditionToSave && expedition.provenance === 'demo'}
         expeditionToSave={stagedExpeditionToSave}
         onComplete={(savedExpedition) => {

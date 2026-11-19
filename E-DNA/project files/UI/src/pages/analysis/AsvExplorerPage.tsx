@@ -280,11 +280,17 @@ export const AsvExplorerPage: React.FC = () => {
             const isSelected = selectedAsvId === asv.asv_id;
             const isUnassigned = asv.assignment_status === 'unassigned';
             const isDivergent = asv.novelty_status === 'potentially_divergent';
+            const activeTaxon = asv.taxonomy?.[filters.taxonomicRank];
             const taxonLabel =
-              asv.taxonomy?.[filters.taxonomicRank] ||
-              asv.taxonomy?.species ||
-              asv.taxonomy?.class ||
-              'Unassigned';
+              activeTaxon && activeTaxon.toLowerCase() !== 'unassigned'
+                ? activeTaxon
+                : asv.taxonomy?.phylum && asv.taxonomy.phylum.toLowerCase() !== 'unassigned'
+                ? asv.taxonomy.phylum
+                : asv.taxonomy?.class && asv.taxonomy.class.toLowerCase() !== 'unassigned'
+                ? asv.taxonomy.class
+                : asv.taxonomy?.species && asv.taxonomy.species.toLowerCase() !== 'unassigned'
+                ? asv.taxonomy.species
+                : asv.taxonomy?.kingdom || 'Unassigned';
 
             // Relative abundance calculation corresponding to bar length
             const relativeAbundance =
@@ -424,11 +430,17 @@ export const AsvExplorerPage: React.FC = () => {
                 {paginatedAsvs.map((asv) => {
                   const metrics = asvMetricsMap.get(asv.asv_id) || { abundance: 0, sampleCount: 0 };
                   const isSelected = selectedAsvId === asv.asv_id;
+                  const activeTaxon = asv.taxonomy?.[filters.taxonomicRank];
                   const taxonLabel =
-                    asv.taxonomy?.[filters.taxonomicRank] ||
-                    asv.taxonomy?.species ||
-                    asv.taxonomy?.class ||
-                    'Unassigned';
+                    activeTaxon && activeTaxon.toLowerCase() !== 'unassigned'
+                      ? activeTaxon
+                      : asv.taxonomy?.phylum && asv.taxonomy.phylum.toLowerCase() !== 'unassigned'
+                      ? asv.taxonomy.phylum
+                      : asv.taxonomy?.class && asv.taxonomy.class.toLowerCase() !== 'unassigned'
+                      ? asv.taxonomy.class
+                      : asv.taxonomy?.species && asv.taxonomy.species.toLowerCase() !== 'unassigned'
+                      ? asv.taxonomy.species
+                      : asv.taxonomy?.kingdom || 'Unassigned';
 
                   return (
                     <tr

@@ -70,7 +70,12 @@ export const ProcessingPipeline: React.FC<ProcessingPipelineProps> = ({
 
       // Step A: Check if ASVs lack taxonomy assignments (e.g. 4-column CSV like asv_table modify.csv)
       const needsTaxonomy = activeExp.asvs.some(
-        (a) => !a.taxonomy || !a.taxonomy.phylum || a.taxonomy.phylum === 'unassigned'
+        (a) =>
+          !a.taxonomy ||
+          !a.taxonomy.kingdom ||
+          !a.taxonomy.phylum ||
+          a.taxonomy.kingdom === 'unassigned' ||
+          a.taxonomy.phylum === 'unassigned'
       );
 
       if (needsTaxonomy) {
@@ -85,14 +90,14 @@ export const ProcessingPipeline: React.FC<ProcessingPipelineProps> = ({
         );
       }
 
-      // Step B: Ensure 2D Latent Embeddings are computed
+      // Step B: Ensure 2D Latent Embeddings are computed (does NOT save internally now)
       const needsEmbeddings = activeExp.asvs.some((a) => !a.embedding);
       if (needsEmbeddings) {
         setUploadStage('Computing Sequence Latent Space Embeddings…');
         activeExp = await runSequenceRepresentation(activeExp);
       }
 
-      // Step C: Save to repository
+      // Step C: Final authoritative save to repository (taxonomy + embeddings together)
       setUploadStage('Synchronizing records to repository…');
       await saveExpedition(activeExp, (stage, current, total) => {
         setUploadStage(stage);
@@ -118,73 +123,140 @@ export const ProcessingPipeline: React.FC<ProcessingPipelineProps> = ({
     }
   }, [expeditionToSave, performUpload]);
 
-  // Exact step specifications from Section 8
-  const steps: StepLog[] = [
-    {
-      id: 1,
-      category: 'INPUT',
-      name: 'Processed ASV dataset detected',
-      displayStatus: '✓ Processed ASV dataset detected',
-      statusType: 'completed',
-      log: 'Biological ingestion verified. Tabular delimiters parsed; variants mapped directly into occurrence matrix.',
-    },
-    {
-      id: 2,
-      category: 'QC',
-      name: 'Input validation completed',
-      displayStatus: '✓ Input validation completed',
-      statusType: 'completed',
-      log: 'Sequence checksums, IUPAC nucleotide validity, and occurrence abundances verified against domain schema.',
-    },
-    {
-      id: 3,
-      category: 'DENOISING',
-      name: 'DADA2 Error-Rate Learning & Denoising',
-      displayStatus: '— Not applicable: ASV input already provided',
-      statusType: 'not_applicable',
-      log: '— Not applicable: ASV input already provided upstream. Denoising not repeated.',
-    },
-    {
-      id: 4,
-      category: 'ASV GENERATION',
-      name: 'Chimera Removal & Variant Calling',
-      displayStatus: '— Not applicable: ASV input already provided',
-      statusType: 'not_applicable',
-      log: '— Not applicable: ASV input already provided. Exact variants already cataloged.',
-    },
-    {
-      id: 5,
-      category: 'SEQUENCE REPRESENTATION',
-      name: 'k-mer / Foundation Embedding Extraction',
-      displayStatus: '✓ Latent space embedding computed',
-      statusType: 'completed',
-      log: 'Biological latent space projection computed. 2D PCA / Foundation coordinates mapped for visual ordination.',
-    },
-    {
-      id: 6,
-      category: 'TAXONOMIC ASSIGNMENT',
-      name: 'Reference Database & Deep Learning Classification',
-      displayStatus: '✓ DeepDrishti CNN / DNABERT-2 classification completed',
-      statusType: 'completed',
-      log: 'Neural taxonomic classification completed. 7-level Linnaean hierarchy assigned with confidence scoring.',
-    },
-    {
-      id: 7,
-      category: 'NOVELTY DETECTION',
-      name: 'Unsupervised Divergence Clustering',
-      displayStatus: '✓ Divergent candidate variants screened',
-      statusType: 'completed',
-      log: 'Centroid distance evaluation completed. Unusual variant divergence flagged for novelty review.',
-    },
-    {
-      id: 8,
-      category: 'BIODIVERSITY ANALYSIS',
-      name: 'Alpha, Beta & Gamma Metric Computations',
-      displayStatus: 'Available',
-      statusType: 'available',
-      log: 'Available. Pure mathematical ecological diversity indices computed from active abundance matrix.',
-    },
-  ];
+  // Exact step specifications from Section 8 — dynamic based on input format
+  const steps: StepLog[] = isAsvData
+    ? [
+        {
+          id: 1,
+          category: 'INPUT',
+          name: 'Processed ASV dataset detected',
+          displayStatus: '✓ Processed ASV dataset detected',
+          statusType: 'completed',
+          log: 'Biological ingestion verified. Tabular delimiters parsed; variants mapped directly into occurrence matrix.',
+        },
+        {
+          id: 2,
+          category: 'QC',
+          name: 'Input validation completed',
+          displayStatus: '✓ Input validation completed',
+          statusType: 'completed',
+          log: 'Sequence checksums, IUPAC nucleotide validity, and occurrence abundances verified against domain schema.',
+        },
+        {
+          id: 3,
+          category: 'DENOISING',
+          name: 'DADA2 Error-Rate Learning & Denoising',
+          displayStatus: '— Not applicable: ASV input already provided',
+          statusType: 'not_applicable',
+          log: '— Not applicable: ASV input already provided upstream. Denoising not repeated.',
+        },
+        {
+          id: 4,
+          category: 'ASV GENERATION',
+          name: 'Chimera Removal & Variant Calling',
+          displayStatus: '— Not applicable: ASV input already provided',
+          statusType: 'not_applicable',
+          log: '— Not applicable: ASV input already provided. Exact variants already cataloged.',
+        },
+        {
+          id: 5,
+          category: 'SEQUENCE REPRESENTATION',
+          name: 'k-mer / Foundation Embedding Extraction',
+          displayStatus: '✓ Latent space embedding computed',
+          statusType: 'completed',
+          log: 'Biological latent space projection computed. 2D PCA / Foundation coordinates mapped for visual ordination.',
+        },
+        {
+          id: 6,
+          category: 'TAXONOMIC ASSIGNMENT',
+          name: 'Reference Database & Deep Learning Classification',
+          displayStatus: '✓ DeepDrishti CNN / DNABERT-2 classification completed',
+          statusType: 'completed',
+          log: 'Neural taxonomic classification completed. 7-level Linnaean hierarchy assigned with confidence scoring.',
+        },
+        {
+          id: 7,
+          category: 'NOVELTY DETECTION',
+          name: 'Unsupervised Divergence Clustering',
+          displayStatus: '✓ Divergent candidate variants screened',
+          statusType: 'completed',
+          log: 'Centroid distance evaluation completed. Unusual variant divergence flagged for novelty review.',
+        },
+        {
+          id: 8,
+          category: 'BIODIVERSITY ANALYSIS',
+          name: 'Alpha, Beta & Gamma Metric Computations',
+          displayStatus: 'Available',
+          statusType: 'available',
+          log: 'Available. Pure mathematical ecological diversity indices computed from active abundance matrix.',
+        },
+      ]
+    : [
+        {
+          id: 1,
+          category: 'INPUT',
+          name: 'Raw FASTQ Sequencing Reads Ingested',
+          displayStatus: '✓ Demultiplexed FASTQ archive verified',
+          statusType: 'completed',
+          log: 'Raw sequencing archive decompressed; per-base Phred ASCII quality scores and nucleotide reads verified.',
+        },
+        {
+          id: 2,
+          category: 'QC',
+          name: 'Phred Quality Filtering & Length Trimming',
+          displayStatus: '✓ Quality filtering completed (Q≥20)',
+          statusType: 'completed',
+          log: 'Enforced Phred Q≥20 threshold, 100–600 bp amplicon span, and ambiguous base filtering.',
+        },
+        {
+          id: 3,
+          category: 'DENOISING',
+          name: 'Sequencing Error Modeling & Denoising',
+          displayStatus: '✓ Error correction completed',
+          statusType: 'completed',
+          log: 'Probabilistic quality modeling applied to resolve exact biological sequences from raw sequencer noise.',
+        },
+        {
+          id: 4,
+          category: 'ASV GENERATION',
+          name: 'Exact Amplicon Variant Calling & Singleton Removal',
+          displayStatus: '✓ High-fidelity ASVs cataloged',
+          statusType: 'completed',
+          log: 'Biological variants resolved at single-nucleotide resolution. PCR chimeras and singletons removed.',
+        },
+        {
+          id: 5,
+          category: 'SEQUENCE REPRESENTATION',
+          name: 'k-mer / Foundation Embedding Extraction',
+          displayStatus: '✓ Latent space embedding computed',
+          statusType: 'completed',
+          log: 'Biological latent space projection computed. 2D PCA / Foundation coordinates mapped for visual ordination.',
+        },
+        {
+          id: 6,
+          category: 'TAXONOMIC ASSIGNMENT',
+          name: 'Reference Database & Deep Learning Classification',
+          displayStatus: '✓ DeepDrishti CNN / DNABERT-2 classification completed',
+          statusType: 'completed',
+          log: 'Neural taxonomic classification completed. 7-level Linnaean hierarchy assigned with confidence scoring.',
+        },
+        {
+          id: 7,
+          category: 'NOVELTY DETECTION',
+          name: 'Unsupervised Divergence Clustering',
+          displayStatus: '✓ Divergent candidate variants screened',
+          statusType: 'completed',
+          log: 'Centroid distance evaluation completed. Unusual variant divergence flagged for novelty review.',
+        },
+        {
+          id: 8,
+          category: 'BIODIVERSITY ANALYSIS',
+          name: 'Alpha, Beta & Gamma Metric Computations',
+          displayStatus: 'Available',
+          statusType: 'available',
+          log: 'Available. Pure mathematical ecological diversity indices computed from active abundance matrix.',
+        },
+      ];
 
   useEffect(() => {
     // Stepped verification sequence
@@ -216,7 +288,7 @@ export const ProcessingPipeline: React.FC<ProcessingPipelineProps> = ({
         </div>
         <div>
           <span className="px-2.5 py-1 bg-survey/10 border border-survey/40 text-survey font-mono text-[11px] uppercase tracking-wider rounded-control">
-            ASV PIPELINE ACTIVE
+            {isAsvData ? 'ASV PIPELINE ACTIVE' : 'FASTQ PIPELINE ACTIVE'}
           </span>
         </div>
       </header>

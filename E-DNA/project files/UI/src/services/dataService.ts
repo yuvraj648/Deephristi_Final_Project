@@ -947,7 +947,7 @@ export async function runSequenceRepresentation(expedition: Expedition): Promise
     if (res.ok) {
       const data = await res.json();
       if (data.expedition) {
-        await saveExpedition(data.expedition);
+        // Don't save here — caller will do the final save after all processing steps
         return data.expedition;
       }
     }
@@ -1027,7 +1027,8 @@ export async function runSequenceRepresentation(expedition: Expedition): Promise
     updated: new Date().toISOString(),
   };
 
-  await saveExpedition(updatedExpedition);
+  // NOTE: Do NOT save here — the caller (ProcessingPipeline) does the final authoritative save
+  // after both taxonomy classification AND embedding are complete.
   return updatedExpedition;
 }
 

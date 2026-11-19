@@ -5,7 +5,7 @@
 // ========================================================
 
 import React, { useState } from 'react';
-import { ArrowLeft, ArrowRight, RefreshCw, CheckCircle2, AlertTriangle, XCircle, Info, MapPin, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, RefreshCw, CheckCircle2, AlertTriangle, XCircle, Info, Sparkles } from 'lucide-react';
 import type { Sample, ASV, Occurrence, ValidationResult } from '../../domain/types';
 import { validateDataset } from '../../services/dataService';
 
