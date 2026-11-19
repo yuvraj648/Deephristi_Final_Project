@@ -23,6 +23,7 @@ import {
   Copy,
   Check,
   Sparkles,
+  Download,
 } from 'lucide-react';
 import type { ASV } from '../../domain/types';
 
@@ -117,6 +118,39 @@ export const AsvExplorerPage: React.FC = () => {
     setActiveDrawer({ type: 'asv', id: asv.asv_id });
   };
 
+  const handleDownloadAllAsvsCsv = () => {
+    const header = 'asv_id,sequence,kingdom,phylum,class,order,family,genus,species,confidence,assignment_status,novelty_status,total_reads,sample_sites';
+    const rows = expedition.asvs.map((asv) => {
+      const metrics = asvMetricsMap.get(asv.asv_id) || { abundance: 0, sampleCount: 0 };
+      const t = asv.taxonomy || {};
+      const esc = (v: string) => `"${(v || '').replace(/"/g, '""')}"`;
+      return [
+        esc(asv.asv_id),
+        esc(asv.sequence),
+        esc(t.kingdom || ''),
+        esc(t.phylum || ''),
+        esc(t.class || ''),
+        esc(t.order || ''),
+        esc(t.family || ''),
+        esc(t.genus || ''),
+        esc(t.species || ''),
+        asv.confidence != null ? (asv.confidence * 100).toFixed(2) : '',
+        esc(asv.assignment_status || ''),
+        esc(asv.novelty_status || ''),
+        metrics.abundance,
+        metrics.sampleCount,
+      ].join(',');
+    });
+
+    const blob = new Blob([header + '\n' + rows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(expedition.title || 'expedition').toLowerCase().replace(/\s+/g, '_')}_all_asvs_${Date.now()}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
+
   const getStatusBadge = (asv: ASV) => {
     if (asv.novelty_status === 'potentially_divergent') {
       return (
@@ -196,6 +230,17 @@ export const AsvExplorerPage: React.FC = () => {
             <span className="px-3 py-1 rounded-full bg-sky-950/80 text-sky-400 border border-sky-800/60 text-[12px] font-medium font-sans">
               {processedAsvs.length} variants
             </span>
+
+            {/* Global Download All CSV Button */}
+            <button
+              type="button"
+              onClick={handleDownloadAllAsvsCsv}
+              className="px-3 py-1.5 flex items-center gap-1.5 bg-[#0B1320] border border-sky-500/40 hover:border-sky-400 text-sky-400 hover:text-sky-300 rounded-control font-mono text-[11px] transition-colors shadow-sm"
+              title="Download all cataloged ASVs in the current expedition as CSV"
+            >
+              <Download size={13} />
+              <span>Download CSV</span>
+            </button>
           </div>
         </div>
 

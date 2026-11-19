@@ -10,3 +10,10 @@ git push origin yuvraj
 git checkout yuvraj
 git checkout main
 git pull origin main 
+
+
+current changes
+git checkout main
+git pull origin main
+git merge yuvraj
+git push origin main
