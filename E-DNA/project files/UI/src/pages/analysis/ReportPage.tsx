@@ -682,6 +682,46 @@ export const ReportPage: React.FC = () => {
         ref={reportRef}
         className="bg-[#05080E] border border-rule/80 rounded-plate p-8 sm:p-12 space-y-8 text-neutral-200 shadow-sm font-sans"
       >
+        {/* Quick Glossary Strip for beginners */}
+        <div className="p-4 bg-sky-950/20 border border-sky-500/20 rounded-plate space-y-2 text-[12px] font-sans">
+          <div className="flex items-center gap-2 font-mono text-[11px] font-semibold text-sky-400 uppercase tracking-wider">
+            <FileText size={13} />
+            <span>Quick Reader's Glossary — Key Terms in This Report</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-[11.5px]">
+            {[
+              {
+                term: 'eDNA',
+                def: 'Environmental DNA — genetic material shed by living organisms into water (through skin, mucus, or waste). We collect water and extract the DNA to identify what lives there without catching a single animal.',
+              },
+              {
+                term: 'ASV (Amplicon Sequence Variant)',
+                def: 'A unique, error-corrected DNA barcode sequence. Each ASV represents one genetically distinct organism lineage detected in the water sample.',
+              },
+              {
+                term: 'Taxa Detected',
+                def: 'The count of distinct biological groups (species, families, etc.) identified by AI classification of the water DNA.',
+              },
+              {
+                term: "Shannon Diversity (H')",
+                def: "An ecological score measuring both species variety and population balance. High scores (>2.5) mean many species sharing the habitat evenly — a sign of a healthy ecosystem.",
+              },
+              {
+                term: 'Candidate Divergent Lineage',
+                def: 'A DNA sequence that differs by >12% from all known species in global databases. This flags it as a potential undocumented organism requiring further laboratory specimen analysis.',
+              },
+              {
+                term: 'Validation Accuracy (%)',
+                def: "How often the AI model correctly identified known species in a held-out test dataset. 94%+ means the model is very reliable at identifying marine life from water DNA.",
+              },
+            ].map(({ term, def }) => (
+              <div key={term} className="bg-[#0a1526] border border-sky-500/10 rounded p-2.5 space-y-0.5">
+                <span className="font-mono text-sky-300 font-semibold text-[11px] block">{term}</span>
+                <span className="text-neutral-300 leading-snug block">{def}</span>
+              </div>
+            ))}
+          </div>
+        </div>
         {/* Document Header Banner */}
         <div className="border-b border-white/10 pb-6 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-neutral-400">

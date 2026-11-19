@@ -24,8 +24,100 @@ import {
   Check,
   Sparkles,
   Download,
+  X,
 } from 'lucide-react';
 import type { ASV } from '../../domain/types';
+
+// Reusable sortable header with inline tooltip for ASV Explorer table
+interface AsvThProps {
+  label: string;
+  sortKey?: string;
+  align?: 'left' | 'right';
+  termTitle: string;
+  meaning: string;
+  formula?: string;
+  interpretation?: string;
+  onSort?: () => void;
+}
+
+const AsvThWithTooltip: React.FC<AsvThProps> = ({
+  label, sortKey, align = 'left', termTitle, meaning, formula, interpretation, onSort,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <th
+      className={`px-4 py-3 font-medium text-neutral-400 select-none relative group ${
+        align === 'right' ? 'text-right' : 'text-left'
+      }`}
+    >
+      <div
+        className={`inline-flex items-center gap-1 ${
+          onSort ? 'cursor-pointer hover:text-white' : ''
+        } ${align === 'right' ? 'justify-end' : ''}`}
+        onClick={onSort}
+      >
+        <span>{label}</span>
+        {onSort && <ArrowUpDown size={12} />}
+        <span
+          className={`text-[10px] font-mono px-0.5 py-0.5 rounded transition-colors ml-0.5 ${
+            isOpen
+              ? 'text-sky-400 bg-sky-950/60 font-bold'
+              : 'text-neutral-600 group-hover:text-sky-400 cursor-help'
+          }`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen(!isOpen);
+          }}
+          title="Click ⓘ to learn what this column means"
+        >
+          ⓘ
+        </span>
+      </div>
+
+      {/* Tooltip Popup */}
+      <div
+        className={`absolute top-full mb-1 w-72 p-3.5 bg-[#050e18] border border-sky-500/50 text-white rounded-plate shadow-2xl z-[150] text-left font-sans text-[11px] leading-snug space-y-2 pointer-events-auto transition-all ${
+          align === 'right' ? 'right-0' : 'left-0'
+        } ${isOpen
+          ? 'opacity-100 visible'
+          : 'opacity-0 invisible group-hover:opacity-100 group-hover:visible'
+        }`}
+      >
+        <div className="flex items-center justify-between border-b border-rule/60 pb-1.5">
+          <span className="font-mono text-[10px] text-sky-400 font-bold uppercase tracking-wider">
+            ⓘ {termTitle}
+          </span>
+          {isOpen && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setIsOpen(false); }}
+              className="text-[11px] text-neutral-400 hover:text-white px-1 rounded hover:bg-white/10"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+        <div>
+          <span className="text-sky-300 font-bold font-mono text-[9.5px] uppercase tracking-wider block">What It Means:</span>
+          <p className="text-neutral-200 text-[11px] leading-relaxed mt-0.5">{meaning}</p>
+        </div>
+        {formula && (
+          <div className="p-2 bg-[#02070e] rounded border border-emerald-500/30">
+            <span className="text-emerald-400 font-mono text-[9.5px] uppercase tracking-wider block font-bold">How It Is Calculated:</span>
+            <code className="text-emerald-200 font-mono text-[10.5px] block pt-0.5 leading-tight">{formula}</code>
+          </div>
+        )}
+        {interpretation && (
+          <div>
+            <span className="text-amber-300 font-bold font-mono text-[9.5px] uppercase tracking-wider block">What This Tells You:</span>
+            <p className="text-neutral-300 text-[10.5px] leading-relaxed mt-0.5">{interpretation}</p>
+          </div>
+        )}
+      </div>
+    </th>
+  );
+};
 
 export const AsvExplorerPage: React.FC = () => {
   const { filteredAsvs, expedition, setActiveDrawer, selectedAsvId, setSelectedAsvId, filters } = useAnalysis();
@@ -429,46 +521,70 @@ export const AsvExplorerPage: React.FC = () => {
             <table className="w-full text-left text-[12px] font-mono border-collapse">
               <thead className="bg-[#0B1320] border-b border-white/10 text-neutral-400 select-none">
                 <tr>
-                  <th
-                    onClick={() => handleSort('asv_id')}
-                    className="px-4 py-3 font-medium cursor-pointer hover:text-white w-32"
-                  >
-                    <div className="flex items-center gap-1">
-                      <span>ASV ID</span>
-                      <ArrowUpDown size={12} />
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 font-medium min-w-[240px]">Nucleotide Sequence</th>
-                  <th
-                    onClick={() => handleSort('samples')}
-                    className="px-4 py-3 font-medium text-right cursor-pointer hover:text-white w-24"
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      <span>Sites</span>
-                      <ArrowUpDown size={12} />
-                    </div>
-                  </th>
-                  <th
-                    onClick={() => handleSort('abundance')}
-                    className="px-4 py-3 font-medium text-right cursor-pointer hover:text-white w-28"
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      <span>Reads</span>
-                      <ArrowUpDown size={12} />
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 font-medium">Taxon ({filters.taxonomicRank})</th>
-                  <th
-                    onClick={() => handleSort('confidence')}
-                    className="px-4 py-3 font-medium text-right cursor-pointer hover:text-white w-20"
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      <span>Conf.</span>
-                      <ArrowUpDown size={12} />
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 font-medium w-32">Status</th>
-                  <th className="px-4 py-3 font-medium w-24">Cluster</th>
+                  <AsvThWithTooltip
+                    label="ASV ID"
+                    sortKey="asv_id"
+                    termTitle="Amplicon Sequence Variant ID"
+                    meaning="A unique identifier code assigned to each distinct, error-corrected DNA barcode sequence detected in the water samples."
+                    formula="ID = Expedition code + Sequential identifier (e.g. ASV_001)"
+                    interpretation="Every ASV represents one genetically unique organism lineage. The same ID across different samples means the same organism was detected in multiple places."
+                    onSort={() => handleSort('asv_id')}
+                  />
+                  <AsvThWithTooltip
+                    label="Nucleotide Sequence"
+                    termTitle="DNA Barcode Sequence"
+                    meaning="The raw string of DNA letters (A, C, G, T) that makes up this unique amplicon barcode, extracted from the water eDNA."
+                    interpretation="This is the actual genetic fingerprint of the organism. Our AI models scan this sequence against millions of known species barcodes to identify the organism."
+                  />
+                  <AsvThWithTooltip
+                    label="Sites"
+                    sortKey="samples"
+                    align="right"
+                    termTitle="Station Occurrence Count"
+                    meaning="The number of distinct geographic sampling stations where this exact DNA sequence was detected."
+                    formula="Sites = Count of unique station IDs with reads > 0 for this ASV"
+                    interpretation="High occurrence across many stations indicates a widespread, ecologically abundant species. Single-station detections may point to depth-specialist or rare endemic organisms."
+                    onSort={() => handleSort('samples')}
+                  />
+                  <AsvThWithTooltip
+                    label="Reads"
+                    sortKey="abundance"
+                    align="right"
+                    termTitle="Total Sequencing Reads"
+                    meaning="The total count of DNA sequence copies mapped to this specific barcode variant across all samples."
+                    formula="Reads = Sum of abundances across all samples for this ASV"
+                    interpretation="Higher read counts indicate a more abundant organism in the water column. Very low reads may need independent validation for reliability."
+                    onSort={() => handleSort('abundance')}
+                  />
+                  <AsvThWithTooltip
+                    label={`Taxon (${filters.taxonomicRank})`}
+                    termTitle="Taxonomic Classification"
+                    meaning="The biological name assigned to this DNA sequence at the currently selected taxonomic rank."
+                    formula="Classification = AI model top prediction at active Linnaean rank"
+                    interpretation="The AI classifies sequences into the 7-level biological hierarchy (Kingdom → Species). The active rank controls which level is displayed."
+                  />
+                  <AsvThWithTooltip
+                    label="Conf."
+                    sortKey="confidence"
+                    align="right"
+                    termTitle="Confidence Score (%)"
+                    meaning="The percentage probability that the AI model's classification is correct for this sequence."
+                    formula="Confidence = Softmax probability of top predicted class × 100"
+                    interpretation="Scores above 90% indicate high-confidence identifications. Scores below 70% should be reviewed carefully and may need additional corroboration."
+                    onSort={() => handleSort('confidence')}
+                  />
+                  <AsvThWithTooltip
+                    label="Status"
+                    termTitle="Assignment Status"
+                    meaning="The classification status assigned by our AI pipeline to this DNA sequence variant."
+                    interpretation="'Assigned' means confidently classified. 'Divergent' means >12% genetic distance from known species. 'Unassigned' means insufficient reference data."
+                  />
+                  <AsvThWithTooltip
+                    label="Cluster"
+                    termTitle="Divergent Candidate Cluster"
+                    meaning="If this ASV was flagged as potentially novel, it is grouped into a named cluster with other related divergent sequences."
+                    interpretation="Clusters group related divergent sequences for field collection and laboratory follow-up specimen analysis."
+                  />
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 bg-[#05080E]">
