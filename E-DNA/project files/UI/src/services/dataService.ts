@@ -349,8 +349,8 @@ export async function parseAsvTable(
           if (siteColIdx !== -1 && parts[siteColIdx]) {
             sample.site = parts[siteColIdx].trim();
           }
-          if (repColIdx !== -1 && parts[repIdx]) {
-            sample.replicate = parts[repIdx].trim();
+          if (repColIdx !== -1 && parts[repColIdx]) {
+            sample.replicate = parts[repColIdx].trim();
           }
 
           sampleMap.set(sampleId, sample);
@@ -1079,7 +1079,7 @@ function inferFallbackTaxonomy(asv: ASV): ASV {
     },
     assignment_status: 'assigned',
     confidence: 0.94,
-    novelty_status: 'cataloged',
+    novelty_status: 'known',
   };
 }
 
