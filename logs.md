@@ -634,3 +634,58 @@ All five local endpoints returned HTTP 200 during the verification on 2026-11-18
   - Proxied status and manual trigger routes in [detectionRoutes.js](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/backend/server/routes/detectionRoutes.js).
 - **Frontend Active Learning HUD ([DetectionPreview.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/components/DetectionPreview.jsx)):**
   - Added dynamic Active Learning telemetry widget displaying progress toward automatic fine-tuning (e.g. `0/10 samples`), training status indicator (`⚙ TRAINING IN BACKGROUND`), and weight readiness indicator.
+
+
+## 28. 2026-11-19 — Fixed transparent navbar user profile dropdown & missing Tailwind theme colors
+
+### 1. Root Cause
+- When clicking the operator avatar profile button (`CA` / Captain Atha) in [Navbar.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/components/Navbar.jsx), the dropdown menu was rendered completely transparent with no background fill, allowing underlying page elements ("ACTIVE ALERTS", "DETECTION ALERT", "CRITICAL") to show through and overlap illegibly.
+- **Underlying Cause:** `Navbar.jsx` referenced `bg-panel-dark` and `border-border-muted`, but [tailwind.config.js](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/tailwind.config.js) lacked definitions for `panel-dark`, `border-muted`, `border-navy`, `severity-*`, and `threat-*`. In Tailwind CSS, undefined color classes produce zero CSS rules, resulting in transparent backgrounds across multiple panels. Additionally, the dropdown lacked an explicit high `z-index`.
+
+### 2. Fixes Applied
+1. **Added Missing Theme Colors to [tailwind.config.js](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/tailwind.config.js):**
+   - Added `panel-dark: "#0a1122"`, `border-muted: "#1e293b"`, `border-navy: "#1e293b"`.
+   - Added semantic colors `severity-critical: "#ef4444"`, `severity-warning: "#f59e0b"`, `threat-high: "#ef4444"`, and `threat-low: "#10b981"`.
+   - Restores solid opaque backgrounds and clean borders across the entire application.
+2. **Fixed Navbar User Profile Dropdown in [Navbar.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/components/Navbar.jsx#L110-L144):**
+   - Set solid opaque background (`bg-slate-950`), `z-[100]`, `shadow-2xl shadow-black/90`, and `border border-slate-700/80`.
+   - Styled user header with `bg-slate-900/90`, clear role tag, and clean hover states for `Profile & settings` and `Sign out`.
+3. **Verification:**
+   - Production Vite build compiled cleanly in 5.60s (`dist/assets/index-B3rOuoLR.css` now includes all generated theme classes).
+
+
+## 29. 2026-11-19 — Active Alerts "Investigate" routing & Bounding box text formatting
+
+### 1. Root Cause
+- In [Dashboard.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/pages/Dashboard.jsx), the `handleAlertAction` handler only checked `if (action === 'resolve')`. When an operator clicked the **INVESTIGATE** button (`action === 'investigate'`), the function returned without taking any action.
+- The **View Alert History** button at the bottom of the Active Alerts panel had no `onClick` handler.
+- In [DetectionRecords.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/pages/DetectionRecords.jsx), the page did not inspect route state or query parameters, so navigating from an alert did not automatically open the corresponding detection or investigation drawer.
+- In [detectionService.js](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/backend/server/services/detectionService.js#L452-L457), alert descriptions attempted to access `boundingBox.x` and `boundingBox.y`, but YOLO bounding boxes are returned as coordinate arrays `[x1, y1, x2, y2]`. This caused descriptions to display `LOCATION IN FRAME: (UNDEFINED, UNDEFINED)`.
+
+### 2. Fixes Applied
+1. **Interactive "INVESTIGATE" Navigation in [Dashboard.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/pages/Dashboard.jsx#L125-L141):**
+   - Updated `handleAlertAction` to navigate to `/detections` with `location.state = { alertId, alert: rawAlert, detectionData: rawAlert?.detectionData }`.
+   - Wired `rawAlert` into `transformedAlerts` and passed it directly to the button `onClick` handler.
+   - Connected **View Alert History** to `navigate('/detections')`.
+2. **Auto-Selection & Immediate Drawer Open in [DetectionRecords.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/pages/DetectionRecords.jsx#L25-L65):**
+   - Added `useLocation()` hook to parse incoming alert route state.
+   - Automatically selects the alerted detection (or synthesizes a high-fidelity record with camera source, snapshot, and telemetry) and puts it directly into `selectedDetection`.
+   - Immediately renders the full **Detection Preview / Investigation Console** with **False Positive**, **Confirm Threat**, **Add Note**, and **Generate Report** controls.
+3. **Fixed Bounding Box Text Formatting in [detectionService.js](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/backend/server/services/detectionService.js#L452-L457):**
+   - Corrected bounding box array inspection to output `BBox: [x1, y1, x2, y2]` with rounded pixel coordinates, removing the `(UNDEFINED, UNDEFINED)` artifact from newly generated alerts.
+4. **Verification:**
+   - Production Vite build compiled cleanly in 7.16s.
+   - Express backend restarted and actively processing feeds on port 5003.
+
+
+## 30. 2026-11-19 — Corrected route path to /detection-records
+
+### 1. Root Cause
+- In [App.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/App.jsx#L38) and [Sidebar.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/components/Sidebar.jsx#L12), the route for Detection Records is `/detection-records`.
+- In [Dashboard.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/pages/Dashboard.jsx), the navigation calls were targeting `/detections` and `/detections-records`, which did not match the registered route.
+
+### 2. Fixes Applied
+1. In [Dashboard.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/pages/Dashboard.jsx#L125-L137): Corrected `navigate('/detection-records', { state: { ... } })` on alert investigation.
+2. In [Dashboard.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/pages/Dashboard.jsx#L368-L377): Corrected **View Alert History** button to `navigate('/detection-records')`.
+3. In [App.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/App.jsx#L38-L47): Added route alias `<Route path="/detections" ... />` in addition to `<Route path="/detection-records" ... />` so both URL paths resolve to the `DetectionRecords` page.
+4. **Verification:** Production Vite build passed in 5.50s.

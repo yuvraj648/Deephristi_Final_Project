@@ -122,8 +122,19 @@ const Dashboard = () => {
     navigate(`/surveillance?feed=${encodeURIComponent(String(feedId))}`);
   };
 
-  const handleAlertAction = async (alertId, action) => {
+  const handleAlertAction = async (alertId, action, alertItem) => {
     try {
+      if (action === 'investigate') {
+        const rawAlert = alertItem?.rawAlert || alerts.find(a => String(a._id) === String(alertId));
+        navigate('/detection-records', {
+          state: {
+            alertId: alertId,
+            alert: rawAlert,
+            detectionData: rawAlert?.detectionData
+          }
+        });
+        return;
+      }
       if (action === 'resolve') {
         await marineService.resolveAlert(alertId, 'Resolved from dashboard');
         // Refresh alerts
@@ -131,7 +142,7 @@ const Dashboard = () => {
         setAlerts(asList(updatedAlerts));
       }
     } catch (err) {
-      console.error('Failed to resolve alert:', err);
+      console.error('Failed to handle alert action:', err);
     }
   };
 
@@ -181,6 +192,7 @@ const Dashboard = () => {
   // Transform alerts data for display
   const transformedAlerts = alerts.slice(0, 8).map(alert => ({
     id: alert._id,
+    rawAlert: alert,
     type: alert.severity === 'critical' ? 'critical' : 
           alert.severity === 'high' ? 'warning' : 'info',
     title: alert.title,
@@ -337,14 +349,14 @@ const Dashboard = () => {
                   )}
                   <button 
                     type="button"
-                    onClick={() => handleAlertAction(alert.id, 'investigate')}
+                    onClick={() => handleAlertAction(alert.id, 'investigate', alert)}
                     className={`w-full py-2 ${
                       alert.color === 'red' 
                         ? 'bg-red-500 hover:bg-red-600 text-white' 
                         : alert.color === 'yellow'
                         ? 'border border-yellow-500/40 hover:bg-yellow-500/20 text-yellow-500'
                         : 'border border-primary/10 text-primary/40'
-                    } text-[10px] font-bold uppercase tracking-widest transition-colors`}
+                    } text-[10px] font-bold uppercase tracking-widest transition-colors cursor-pointer`}
                   >
                     {alert.dismissed ? 'Dismissed' : 'Investigate'}
                   </button>
@@ -354,7 +366,11 @@ const Dashboard = () => {
           </div>
           
           <div className="p-4 bg-background-dark border-t border-primary/10">
-            <button className="w-full flex items-center justify-center gap-2 text-[10px] text-primary font-bold uppercase tracking-widest py-2 border border-primary/20 hover:bg-primary/5 transition-colors">
+            <button 
+              type="button"
+              onClick={() => navigate('/detection-records')}
+              className="w-full flex items-center justify-center gap-2 text-[10px] text-primary font-bold uppercase tracking-widest py-2 border border-primary/20 hover:bg-primary/5 transition-colors cursor-pointer"
+            >
               <span className="material-symbols-outlined text-sm">history</span>
               View Alert History
             </button>

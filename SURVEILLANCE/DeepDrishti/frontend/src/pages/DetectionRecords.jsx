@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import axios from 'axios';
 import AppShell from '../components/AppShell';
 import DetectionRow from '../components/DetectionRow';
@@ -11,6 +12,7 @@ const API_BASE =
   'http://localhost:5003/api/v1';
 
 const DetectionRecords = () => {
+  const location = useLocation();
   const [selectedDetection, setSelectedDetection] = useState(null);
   const [detections, setDetections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +24,49 @@ const DetectionRecords = () => {
   const [dateFilter, setDateFilter] = useState('Last 24h');
   const [showExportPreview, setShowExportPreview] = useState(false);
 
+  // Handle incoming alert investigation navigation
+  useEffect(() => {
+    const targetAlert = location.state?.alert;
+    const targetDetection = location.state?.detection;
+    const targetDetectionId = location.state?.detectionId || location.state?.id;
+
+    if (targetDetection) {
+      setSelectedDetection(targetDetection);
+      return;
+    }
+
+    if (targetAlert) {
+      const dData = targetAlert.detectionData || {};
+      const alertDet = {
+        id: `ALT-${String(targetAlert._id || targetAlert.id || Date.now()).slice(-8).toUpperCase()}`,
+        cameraSource: targetAlert.location || targetAlert.sector || 'CAM_SURVEILLANCE',
+        objectDetected: dData.detectedObject || targetAlert.title?.replace('Alert:', '').trim() || 'SEA MINE',
+        confidence: typeof targetAlert.confidence === 'number'
+          ? (targetAlert.confidence <= 1 ? targetAlert.confidence * 100 : targetAlert.confidence)
+          : 78.0,
+        timestamp: targetAlert.createdAt || new Date(),
+        status: 'investigating',
+        threatStatus: 'DANGER',
+        distance_m: typeof dData.distance_m === 'number' ? dData.distance_m : 5.4,
+        modelsUsed: dData.modelsUsed || ['FUNIE-GAN', 'YOLOv8', 'MiDaS'],
+        boundingBox: dData.boundingBox || null,
+        snapshotPath: dData.snapshotPath || null,
+        enhancedImage: dData.snapshotPath || null,
+        reviewNotes: targetAlert.description || ''
+      };
+
+      setSelectedDetection(alertDet);
+      setDetections((prev) => {
+        if (!prev || prev.length === 0) return [alertDet];
+        const exists = prev.some(d => d.id === alertDet.id);
+        return exists ? prev : [alertDet, ...prev];
+      });
+    } else if (targetDetectionId && detections.length > 0) {
+      const match = detections.find(d => String(d.id) === String(targetDetectionId) || String(d._id) === String(targetDetectionId));
+      if (match) setSelectedDetection(match);
+    }
+  }, [location.state]);
+
   // Fetch detections from API
   const fetchDetections = async () => {
     try {
@@ -31,7 +76,13 @@ const DetectionRecords = () => {
       const response = await axios.get(`${API_BASE.replace(/\/$/, '')}/detections`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      setDetections(response.data.data ?? []);
+      const fetched = response.data.data ?? [];
+      setDetections((prev) => {
+        if (selectedDetection && !fetched.some(d => d.id === selectedDetection.id)) {
+          return [selectedDetection, ...fetched];
+        }
+        return fetched;
+      });
     } catch (err) {
       console.error('Error fetching detections:', err);
       setError('Failed to fetch detections from server');

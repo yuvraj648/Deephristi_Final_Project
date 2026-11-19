@@ -40,6 +40,11 @@ function App() {
             <DetectionRecords />
           </ProtectedRoute>
         } />
+        <Route path="/detections" element={
+          <ProtectedRoute>
+            <DetectionRecords />
+          </ProtectedRoute>
+        } />
         <Route path="/reports" element={
           <ProtectedRoute requiredRole="surveillance_head">
             <Reports />

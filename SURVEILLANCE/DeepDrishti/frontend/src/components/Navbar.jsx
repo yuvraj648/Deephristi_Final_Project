@@ -110,36 +110,40 @@ const Navbar = () => {
           {menuOpen && (
             <div
               role="menu"
-              className="absolute right-0 mt-2 w-56 border border-border-muted bg-panel-dark py-1 shadow-xl"
+              className="absolute right-0 mt-2 w-60 rounded-md border border-slate-700/80 bg-slate-950 py-1 shadow-2xl shadow-black/90 z-[100] ring-1 ring-slate-800"
             >
-              <div className="border-b border-border-muted px-3 py-2">
-                <p className="text-xs font-bold text-slate-100">{displayName}</p>
-                <p className="text-[10px] text-slate-500">{user?.email || '—'}</p>
+              <div className="border-b border-slate-800/80 bg-slate-900/90 px-3.5 py-2.5">
+                <p className="text-xs font-bold text-slate-100 truncate">{displayName}</p>
+                <p className="text-[11px] text-slate-400 font-mono truncate">{user?.email || '—'}</p>
                 {roleLabel && (
-                  <p className="mt-1 text-[10px] font-bold uppercase text-primary">{roleLabel}</p>
+                  <span className="inline-block mt-1.5 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-primary/15 text-primary border border-primary/30">
+                    {roleLabel}
+                  </span>
                 )}
               </div>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false);
-                  navigate('/settings');
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-800"
-              >
-                <span className="material-symbols-outlined text-sm">person</span>
-                Profile &amp; settings
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={handleLogout}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-rose-400 hover:bg-rose-500/10"
-              >
-                <span className="material-symbols-outlined text-sm">logout</span>
-                Sign out
-              </button>
+              <div className="py-1">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    navigate('/settings');
+                  }}
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs text-slate-300 hover:bg-slate-800/80 hover:text-white transition-colors"
+                >
+                  <span className="material-symbols-outlined text-sm text-primary">person</span>
+                  Profile &amp; settings
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-rose-400 hover:bg-rose-500/15 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-sm">logout</span>
+                  Sign out
+                </button>
+              </div>
             </div>
           )}
         </div>

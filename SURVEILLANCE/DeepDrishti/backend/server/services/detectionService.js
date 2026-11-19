@@ -450,7 +450,12 @@ class DetectionService {
     }
 
     if (detectionResult.boundingBox) {
-      description += `Location in frame: (${detectionResult.boundingBox.x}, ${detectionResult.boundingBox.y}).`;
+      if (Array.isArray(detectionResult.boundingBox) && detectionResult.boundingBox.length >= 4) {
+        const [x1, y1, x2, y2] = detectionResult.boundingBox;
+        description += `BBox: [${Math.round(x1)}, ${Math.round(y1)}, ${Math.round(x2)}, ${Math.round(y2)}].`;
+      } else if (detectionResult.boundingBox.x !== undefined && detectionResult.boundingBox.y !== undefined) {
+        description += `Location: (${detectionResult.boundingBox.x}, ${detectionResult.boundingBox.y}).`;
+      }
     }
 
     return description;
