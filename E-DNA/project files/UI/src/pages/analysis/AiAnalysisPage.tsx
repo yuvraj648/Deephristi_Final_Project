@@ -1095,10 +1095,32 @@ const AsvFileClassifySection: React.FC = () => {
       }
 
       const delimiter = lines[0].includes('\t') ? '\t' : ',';
-      const header = lines[0].split(delimiter).map((h) => h.trim().toLowerCase().replace(/['"]/g, ''));
+
+      // Quote-aware CSV line splitter
+      const splitCsvLine = (line: string): string[] => {
+        const result: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"' || char === "'") {
+            inQuotes = !inQuotes;
+          } else if (char === delimiter && !inQuotes) {
+            result.push(current.trim().replace(/^["']|["']$/g, ''));
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        result.push(current.trim().replace(/^["']|["']$/g, ''));
+        return result;
+      };
+
+      const rawHeaders = splitCsvLine(lines[0]);
+      const header = rawHeaders.map((h) => h.trim().toLowerCase().replace(/['"]/g, ''));
 
       // 1. Detect sequence column by inspecting actual data cell content (A, C, G, T, N only >= 20 bp)
-      const firstData = lines[1].split(delimiter).map((c) => c.trim().replace(/^["']|["']$/g, ''));
+      const firstData = splitCsvLine(lines[1]);
       let seqColIdx = firstData.findIndex((c) => {
         const clean = c.toUpperCase().replace(/[^ACGTN]/g, '');
         return clean.length >= 20 && clean.length / c.length >= 0.85;
@@ -1107,32 +1129,32 @@ const AsvFileClassifySection: React.FC = () => {
       // Fallback by header name if content inspect didn't match
       if (seqColIdx === -1) {
         seqColIdx = header.findIndex((h) => 
-          (h === 'sequence' || h === 'dna' || h === 'seq' || h === 'asv' || h === 'amplicon' || h.includes('nucleotide')) &&
+          (h === 'dna_sequence' || h === 'sequence' || h === 'dna' || h === 'seq' || h === 'asv' || h === 'amplicon' || h.includes('nucleotide') || h.includes('sequence')) &&
           !h.includes('id')
         );
       }
 
       if (seqColIdx === -1) {
-        throw new Error('Could not identify a DNA sequence column in the uploaded ASV file.');
+        throw new Error('Could not identify a DNA sequence column in the uploaded ASV file. Expected "Sequence" or "DNA_sequence".');
       }
 
-      // ID column: any column with id/asv/variant/sample that is NOT the sequence column
+      // ID column: occurrenceid, asv_id, id, etc.
       let idColIdx = header.findIndex((h, idx) => 
         idx !== seqColIdx && 
-        (h.includes('id') || h === 'asv' || h.includes('variant') || h.includes('sample') || h.includes('name'))
+        (h === 'occurrenceid' || h === 'asv_id' || h === 'asvid' || h === 'id' || h.includes('id') || h === 'asv' || h.includes('variant') || h.includes('sample') || h.includes('name'))
       );
 
-      // Abundance column: reads, count, abundance, size, frequency
+      // Abundance column: organismquantity, reads, count, abundance, size, frequency
       let abundColIdx = header.findIndex((h, idx) => 
         idx !== seqColIdx && 
-        (h.includes('reads') || h.includes('abundance') || h.includes('count') || h.includes('size'))
+        (h === 'organismquantity' || h.includes('reads') || h.includes('abundance') || h.includes('count') || h.includes('size'))
       );
 
       const parsedAsvs: any[] = [];
       const parsedOccs: any[] = [];
 
       for (let i = 1; i < lines.length; i++) {
-        const parts = lines[i].split(delimiter).map((p) => p.trim().replace(/^["']|["']$/g, ''));
+        const parts = splitCsvLine(lines[i]);
         const seq = parts[seqColIdx]?.toUpperCase().replace(/[^ACGTN]/g, '');
         if (!seq || seq.length < 15) continue;
 
