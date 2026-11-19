@@ -80,7 +80,7 @@ class DetectionService {
     try {
       // Get all active feeds
       const activeFeeds = await Feed.findActive();
-      
+
       // Start detection for each active feed
       for (const feed of activeFeeds) {
         if (feed.detectionEnabled) {
@@ -98,7 +98,7 @@ class DetectionService {
   // Start detection for a specific feed
   startFeedDetection(feed) {
     const feedId = feed._id.toString();
-    
+
     // Clear existing interval if any
     if (this.detectionIntervals.has(feedId)) {
       clearInterval(this.detectionIntervals.get(feedId));
@@ -127,13 +127,13 @@ class DetectionService {
     try {
       // Simulate frame capture (in real implementation, this would capture from video stream)
       const frameData = await this.simulateFrameCapture(feed);
-      
+
       // Send frame to Flask detection API
       const detectionResult = await this.sendToFlaskAPI(frameData);
-      
+
       // Process detection result and create alerts if necessary
       await this.processDetectionResult(feed, detectionResult);
-      
+
       // Update feed with detection info
       await Feed.updateDetectionStats(feed._id, {
         timestamp: new Date(),
@@ -143,7 +143,7 @@ class DetectionService {
       });
 
       console.log(`Detection processed for ${feed.title}: ${detectionResult.threat ? 'THREAT' : 'CLEAR'} (${detectionResult.confidence})`);
-      
+
     } catch (error) {
       console.error(`Error processing detection for feed ${feed.title}:`, error);
     }
@@ -155,7 +155,7 @@ class DetectionService {
     // 1. Capture frame from video stream
     // 2. Preprocess the frame
     // 3. Return frame data for API call
-    
+
     return {
       feedId: feed._id,
       timestamp: new Date(),
@@ -179,12 +179,13 @@ class DetectionService {
         if (settings && typeof settings.confidenceThreshold === 'number') {
           stationThreshold = settings.confidenceThreshold;
         }
-      } catch {}
+      } catch { }
 
-      // Use /pipeline instead of /detect to get enhancement and depth without writing temporary frames to disk
+      // Use /pipeline — save_output:true so Flask writes the enhanced JPEG to disk
+      // This gives us a snapshotPath URL to display in DetectionPreview
       const response = await axios.post(
         `${this.flaskApiUrl}/pipeline`,
-        { ...frameData, save_output: false, conf: stationThreshold },
+        { ...frameData, save_output: true, conf: stationThreshold },
         {
           timeout: 30000, // Increased timeout for full pipeline (YouTube extraction + ML)
           headers: {
@@ -205,10 +206,10 @@ class DetectionService {
       const topDetection = detections.length
         ? [...detections].sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0]
         : null;
-      
+
       return {
         threat: detections.some(d => d.status === 'DANGER') || false,
-        confidence: detections.length > 0 
+        confidence: detections.length > 0
           ? Math.max(...detections.map(d => d.confidence))
           : 0,
         type: detections.length > 0
@@ -337,15 +338,15 @@ class DetectionService {
           const records = detList.length
             ? detList
             : [
-                {
-                  class: detectionResult.detectedObject || objectLabel,
-                  confidence: detectionResult.confidence,
-                  bbox: detectionResult.boundingBox,
-                  distance_m: detectionResult.distance_m,
-                  models_used: detectionResult.modelsUsed,
-                  status: detectionResult.threat ? 'DANGER' : 'NEUTRAL',
-                },
-              ];
+              {
+                class: detectionResult.detectedObject || objectLabel,
+                confidence: detectionResult.confidence,
+                bbox: detectionResult.boundingBox,
+                distance_m: detectionResult.distance_m,
+                models_used: detectionResult.modelsUsed,
+                status: detectionResult.threat ? 'DANGER' : 'NEUTRAL',
+              },
+            ];
 
           await Detection.insertMany(
             records.map((d) => ({
@@ -435,7 +436,7 @@ class DetectionService {
       object: 'Suspicious Object Detected',
       threat: 'Potential Threat Identified'
     };
-    
+
     return titles[detectionResult.type] || 'Detection Alert';
   }
 
@@ -443,30 +444,30 @@ class DetectionService {
   generateAlertDescription(feed, detectionResult) {
     let description = `Detection in ${feed.location} sector (${feed.sector}). `;
     description += `Confidence: ${(detectionResult.confidence * 100).toFixed(1)}%. `;
-    
+
     if (detectionResult.detectedObject) {
       description += `Detected: ${detectionResult.detectedObject}. `;
     }
-    
+
     if (detectionResult.boundingBox) {
       description += `Location in frame: (${detectionResult.boundingBox.x}, ${detectionResult.boundingBox.y}).`;
     }
-    
+
     return description;
   }
 
   // Stop all detection services
   stopDetectionService() {
     console.log('Stopping marine detection service...');
-    
+
     // Clear all intervals
     for (const [feedId, interval] of this.detectionIntervals) {
       clearInterval(interval);
     }
-    
+
     this.detectionIntervals.clear();
     this.isRunning = false;
-    
+
     console.log('Detection service stopped');
   }
 

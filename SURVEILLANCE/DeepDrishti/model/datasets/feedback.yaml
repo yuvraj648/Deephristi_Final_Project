@@ -1,0 +1,11 @@
+path: ../datasets
+train: positive
+val: negative
+nc: 6
+names:
+  0: mine
+  1: submarine
+  2: human
+  3: structure
+  4: trash
+  5: fish

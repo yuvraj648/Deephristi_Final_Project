@@ -591,3 +591,46 @@ All five local endpoints returned HTTP 200 during the verification on 2026-11-18
 4. **Verification:**
    - Verified `imageio_ffmpeg` (v0.8.1) loads successfully in global Python.
    - Verified `model\.venv\Scripts\python.exe` launches with `torch.cuda.is_available() == True` on `NVIDIA GeForce RTX 3050 Laptop GPU`.
+
+
+## 27. 2026-11-19 — Threat image snapshot visibility, Option B video streaming headers, and Full HITL Active Learning implementation
+
+### 1. Threat Image Snapshot Visibility in Detection Records
+- **Root Cause:**
+  - `detectionService.js` was passing `save_output: false` to Flask's `/pipeline` endpoint to avoid writing continuous video frames. As a result, Flask returned `enhanced_image_path: null`, causing `snapshotPath` and `enhancedImage` to be stored as `null` in MongoDB.
+  - When a local image path was provided to `/pipeline`, `app.py` attempted to read it via `_read_frame_from_video(url)` (`cv2.VideoCapture`), which failed on static image files.
+- **Fixes Applied:**
+  - In [detectionService.js](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/backend/server/services/detectionService.js#L184-L190): Changed `save_output: true` for detections so that Flask writes enhanced frames to `outputs/lab_<timestamp>_<token>.jpg` and returns the file path.
+  - In [app.py](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/model/app.py#L406-L411): Added `allowed_file(url)` check to load static local files using `cv2.imread(url)` before falling back to video capture.
+  - In [DetectionPreview.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/components/DetectionPreview.jsx): Cleaned up component, resolved duplicate exports, and added error-handling for images so telemetry fallback is displayed gracefully when no image exists.
+
+### 2. Option B Rendered Video Playback in Chrome
+- **Root Cause:**
+  - In `app.py`, the `/outputs/<filename>` route was applying `Cache-Control: no-cache, no-store, must-revalidate` and `Pragma: no-cache` globally to all served files.
+  - Chrome's HTML5 media player uses HTTP 206 Partial Content Range requests (`Range: bytes=0-`) to buffer video files. Under `no-store`, Chrome's media pipeline is forbidden from buffering byte chunks, causing the player to stall at `0:00`.
+  - In `EnhancementLab.jsx`, the `<video>` tag used `autoPlay` without `muted` and `playsInline`, which is subject to Chrome's strict Autoplay policy.
+- **Fixes Applied:**
+  - In [app.py](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/model/app.py#L674-L685): Video files (`.mp4`, `.mov`, `.webm`, `.mkv`) are now served with `Cache-Control: public, max-age=86400, no-transform` and `Accept-Ranges: bytes`. Non-video assets retain `no-cache` semantics.
+  - In [EnhancementLab.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/pages/EnhancementLab.jsx#L601-L608): Added `muted playsInline` to the rendered video element.
+
+### 3. End-to-End Human-in-the-Loop (HITL) Active Learning
+- **Dataset Structure:**
+  - Created [feedback.yaml](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/model/datasets/feedback.yaml) defining the 6 marine classes (`mine`, `submarine`, `human`, `structure`, `trash`, `fish`).
+  - Created `model/datasets/positive` and `model/datasets/negative` directories.
+  - Created `model/datasets/feedback_count.json` to persist feedback counts and training run metadata.
+- **Feedback Collection ([save_feedback.py](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/model/scripts/save_feedback.py)):**
+  - False positives are saved to `negative/` without bounding boxes (treated by YOLO as background samples to suppress seabed and reef noise).
+  - Confirmed detections are saved to `positive/` with normalized YOLO bounding box label files (`.txt`).
+- **Asynchronous Fine-Tuning ([finetune.py](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/model/scripts/finetune.py)):**
+  - Runs YOLOv8 training on NVIDIA RTX 3050 CUDA (batch=8, 10 epochs, low learning rate `lr0=0.0005`, early stopping).
+  - Saves new specialized weights to `models/best_feedback.pt` without overwriting `best.pt` automatically.
+- **Flask Endpoints & Process Isolation:**
+  - Added `/feedback/negative`, `/feedback/positive`, `/finetune/status`, `/finetune/trigger`, and `/finetune/promote` to `app.py`.
+  - Spawns fine-tuning as an isolated background subprocess (`subprocess.Popen`) so Flask `/pipeline` and live inference are never blocked.
+  - Automatically triggers when accumulated feedback reaches threshold (10 samples).
+  - `/finetune/promote` endpoint allows promoting `best_feedback.pt` to `best.pt` with hot model reload.
+- **Node.js Integration ([detectionController.js](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/backend/server/controllers/detectionController.js)):**
+  - `confirmDetection()` and `markFalsePositive()` send fire-and-forget HTTP requests to Flask feedback endpoints.
+  - Proxied status and manual trigger routes in [detectionRoutes.js](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/backend/server/routes/detectionRoutes.js).
+- **Frontend Active Learning HUD ([DetectionPreview.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/components/DetectionPreview.jsx)):**
+  - Added dynamic Active Learning telemetry widget displaying progress toward automatic fine-tuning (e.g. `0/10 samples`), training status indicator (`⚙ TRAINING IN BACKGROUND`), and weight readiness indicator.

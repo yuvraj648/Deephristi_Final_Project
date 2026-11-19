@@ -1,4 +1,5 @@
 const express = require('express');
+const axios = require('axios');
 const {
   getAllDetections,
   getDetectionById,
@@ -18,6 +19,7 @@ const {
 } = require('../middleware/authorize');
 
 const router = express.Router();
+const FLASK_URL = process.env.FLASK_API_URL || 'http://localhost:5001';
 
 router.use(protect);
 router.use(blockAnalystWrites);
@@ -25,6 +27,34 @@ router.use(blockAnalystWrites);
 router.get('/', authorizeAllRegistered(), getAllDetections);
 
 router.get('/stats', authorizeAllRegistered(), getDetectionStats);
+
+// HITL: Proxy finetune status/trigger to Flask
+router.get('/finetune/status', authorizeAllRegistered(), async (req, res) => {
+  try {
+    const r = await axios.get(`${FLASK_URL}/finetune/status`, { timeout: 5000 });
+    res.json(r.data);
+  } catch (e) {
+    res.json({ success: false, message: 'Flask not reachable', error: e.message });
+  }
+});
+
+router.post('/finetune/trigger', authorize('captain', 'engineer'), async (req, res) => {
+  try {
+    const r = await axios.post(`${FLASK_URL}/finetune/trigger`, {}, { timeout: 5000 });
+    res.json(r.data);
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/finetune/promote', authorize('captain'), async (req, res) => {
+  try {
+    const r = await axios.post(`${FLASK_URL}/finetune/promote`, {}, { timeout: 10000 });
+    res.json(r.data);
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
 
 router.get('/:id', authorizeAllRegistered(), getDetectionById);
 

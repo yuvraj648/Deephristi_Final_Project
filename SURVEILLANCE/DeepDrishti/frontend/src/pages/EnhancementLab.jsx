@@ -600,9 +600,12 @@ const EnhancementLab = () => {
                 </div>
                 {renderedVideoUrl ? (
                   <video
+                    key={renderedVideoUrl}
                     src={renderedVideoUrl}
                     controls
                     autoPlay
+                    muted
+                    playsInline
                     loop
                     className="w-full h-full object-cover"
                   />

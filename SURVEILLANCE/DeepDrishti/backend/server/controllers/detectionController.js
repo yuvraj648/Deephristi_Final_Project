@@ -1,4 +1,34 @@
 const Detection = require('../models/Detection');
+const axios = require('axios');
+
+const FLASK_URL = process.env.FLASK_API_URL || 'http://localhost:5001';
+
+/**
+ * Send operator feedback to Flask HITL endpoints.
+ * Runs fire-and-forget (non-blocking) — errors are logged, never thrown.
+ */
+async function _sendHitlFeedback(type, detection) {
+  try {
+    const imageSource = detection.snapshotPath || detection.enhancedImage || null;
+    if (!imageSource) return; // No image saved — skip silently
+
+    if (type === 'negative') {
+      await axios.post(`${FLASK_URL}/feedback/negative`, { image_source: imageSource }, { timeout: 5000 });
+      console.log(`[HITL] ✅ Negative sample sent to Flask for detection ${detection.id}`);
+    } else if (type === 'positive') {
+      const bbox = detection.boundingBox || [0.1, 0.1, 0.9, 0.9];
+      const className = detection.objectDetected || 'unknown';
+      await axios.post(`${FLASK_URL}/feedback/positive`, {
+        image_source: imageSource,
+        bbox,
+        class_name: className,
+      }, { timeout: 5000 });
+      console.log(`[HITL] ✅ Positive sample sent to Flask for detection ${detection.id}`);
+    }
+  } catch (err) {
+    console.warn(`[HITL] ⚠️  Failed to send ${type} feedback to Flask: ${err.message}`);
+  }
+}
 
 // Helper function to generate unique detection ID
 const generateDetectionId = () => {
@@ -266,6 +296,9 @@ const confirmDetection = async (req, res, next) => {
 
     await detection.confirm(reviewedBy, notes);
 
+    // HITL: Fire-and-forget — save confirmed frame as positive training sample
+    _sendHitlFeedback('positive', detection).catch(() => {});
+
     res.status(200).json({
       status: 'success',
       data: detection,
@@ -295,6 +328,9 @@ const markFalsePositive = async (req, res, next) => {
     }
 
     await detection.markFalsePositive(reviewedBy, notes);
+
+    // HITL: Fire-and-forget — save rejected frame as negative (background) training sample
+    _sendHitlFeedback('negative', detection).catch(() => {});
 
     res.status(200).json({
       status: 'success',

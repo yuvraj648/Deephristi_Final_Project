@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import time
 import uuid
 import subprocess
@@ -404,7 +405,10 @@ def pipeline():
                         img_cv = None
             elif img_cv is None and isinstance(url, str) and os.path.exists(url):
                  print(f"📁 Opening local path: {url}")
-                 img_cv = _read_frame_from_video(url)
+                 if allowed_file(url):
+                     img_cv = cv2.imread(url)
+                 if img_cv is None:
+                     img_cv = _read_frame_from_video(url)
 
     if img_cv is None:
         return jsonify({"error": "No image provided"}), 400
@@ -673,9 +677,14 @@ def pipeline():
 @app.route('/outputs/<path:filename>')
 def serve_output(filename):
     response = send_from_directory(OUTPUT_FOLDER, filename)
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
+    # Video files require range caching so Chrome and Safari media pipelines can buffer, seek, and stream
+    if filename.lower().endswith(('.mp4', '.mov', '.webm', '.mkv')):
+        response.headers['Cache-Control'] = 'public, max-age=86400, no-transform'
+        response.headers['Accept-Ranges'] = 'bytes'
+    else:
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
     return response
 
 @app.route('/render-video', methods=['POST'])
@@ -822,6 +831,164 @@ def render_video():
             "model_device": str(DEVICE)
         }
     })
+
+# -------------------- HITL ACTIVE LEARNING ENDPOINTS --------------------
+# These endpoints let the Node backend save operator feedback frames and
+# trigger background fine-tuning after FINETUNE_THRESHOLD samples.
+
+FINETUNE_THRESHOLD = 10  # Trigger re-training after this many total feedback items
+_finetune_process = None  # Track the background fine-tune subprocess
+
+def _get_feedback_module():
+    """Lazy-import save_feedback so app starts even if scripts dir is missing."""
+    import importlib.util, sys
+    scripts_dir = os.path.join(os.path.dirname(__file__), 'scripts')
+    spec = importlib.util.spec_from_file_location("save_feedback", os.path.join(scripts_dir, "save_feedback.py"))
+    if spec is None:
+        return None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+def _maybe_trigger_finetune(counts):
+    """Spawn background fine-tune if threshold met and no run is active."""
+    global _finetune_process
+    if counts.get('total', 0) < FINETUNE_THRESHOLD:
+        return
+    if _finetune_process is not None and _finetune_process.poll() is None:
+        print("[HITL] Fine-tune already running in background — skipping trigger.", flush=True)
+        return
+    scripts_dir = os.path.join(os.path.dirname(__file__), 'scripts')
+    finetune_script = os.path.join(scripts_dir, 'finetune.py')
+    python_exe = sys.executable
+    device_arg = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"[HITL] 🚀 Triggering background fine-tune on {device_arg.upper()} ...", flush=True)
+    _finetune_process = subprocess.Popen(
+        [python_exe, finetune_script, '--device', device_arg],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        cwd=os.path.dirname(__file__)
+    )
+
+@app.route('/feedback/negative', methods=['POST'])
+def feedback_negative():
+    """
+    Mark a detection frame as a false positive (background sample).
+    Body (JSON): { "image_source": "/outputs/lab_xxx.jpg" | "<base64 data URI>" | "abs path" }
+    """
+    data = request.get_json(force=True, silent=True) or {}
+    image_source = data.get('image_source') or data.get('snapshotPath') or data.get('enhancedImage')
+    if not image_source:
+        return jsonify({"error": "image_source is required"}), 400
+    fb = _get_feedback_module()
+    if fb is None:
+        return jsonify({"error": "save_feedback module not found"}), 500
+    counts = fb.save_negative(image_source)
+    _maybe_trigger_finetune(counts)
+    return jsonify({
+        "success": True,
+        "counts": counts,
+        "finetune_triggered": counts.get('total', 0) >= FINETUNE_THRESHOLD
+    })
+
+@app.route('/feedback/positive', methods=['POST'])
+def feedback_positive():
+    """
+    Mark a detection as confirmed (positive training sample).
+    Body (JSON): {
+      "image_source": "/outputs/lab_xxx.jpg",
+      "bbox": [x1, y1, x2, y2],      // pixel or 0-1 normalised
+      "class_name": "sea mine",
+      "image_w": 640,  // optional, used to normalise pixel bboxes
+      "image_h": 480
+    }
+    """
+    data = request.get_json(force=True, silent=True) or {}
+    image_source = data.get('image_source') or data.get('snapshotPath') or data.get('enhancedImage')
+    bbox = data.get('bbox') or data.get('boundingBox')
+    class_name = data.get('class_name') or data.get('objectDetected') or 'unknown'
+    image_w = data.get('image_w', 640)
+    image_h = data.get('image_h', 480)
+
+    if not image_source:
+        return jsonify({"error": "image_source is required"}), 400
+    if not bbox or len(bbox) < 4:
+        bbox = [0.1, 0.1, 0.9, 0.9]  # Safe fallback centre fill
+
+    fb = _get_feedback_module()
+    if fb is None:
+        return jsonify({"error": "save_feedback module not found"}), 500
+    counts = fb.save_positive(image_source, bbox, class_name, image_w=image_w, image_h=image_h)
+    _maybe_trigger_finetune(counts)
+    return jsonify({
+        "success": True,
+        "counts": counts,
+        "finetune_triggered": counts.get('total', 0) >= FINETUNE_THRESHOLD
+    })
+
+@app.route('/finetune/status', methods=['GET'])
+def finetune_status():
+    """Return feedback sample counts and last fine-tune info."""
+    global _finetune_process
+    datasets_dir = os.path.join(os.path.dirname(__file__), 'datasets')
+    count_file = os.path.join(datasets_dir, 'feedback_count.json')
+    counts = {}
+    if os.path.exists(count_file):
+        with open(count_file, 'r') as f:
+            counts = json.load(f)
+    
+    training_active = (_finetune_process is not None and _finetune_process.poll() is None)
+    best_feedback_exists = os.path.exists(os.path.join(os.path.dirname(__file__), 'models', 'best_feedback.pt'))
+    
+    return jsonify({
+        "success": True,
+        "counts": counts,
+        "threshold": FINETUNE_THRESHOLD,
+        "samples_until_finetune": max(0, FINETUNE_THRESHOLD - counts.get('total', 0)),
+        "training_active": training_active,
+        "best_feedback_available": best_feedback_exists
+    })
+
+@app.route('/finetune/trigger', methods=['POST'])
+def finetune_trigger():
+    """Manually trigger fine-tuning (bypasses count threshold)."""
+    global _finetune_process
+    if _finetune_process is not None and _finetune_process.poll() is None:
+        return jsonify({"success": False, "message": "Fine-tuning already running"}), 409
+    datasets_dir = os.path.join(os.path.dirname(__file__), 'datasets')
+    count_file = os.path.join(datasets_dir, 'feedback_count.json')
+    counts = {}
+    if os.path.exists(count_file):
+        with open(count_file, 'r') as f:
+            counts = json.load(f)
+    _maybe_trigger_finetune({**counts, 'total': FINETUNE_THRESHOLD})  # Force trigger
+    return jsonify({"success": True, "message": "Fine-tuning triggered in background"})
+
+@app.route('/finetune/promote', methods=['POST'])
+def finetune_promote():
+    """
+    Promote best_feedback.pt → best.pt and hot-reload the YOLO model.
+    After this, /pipeline will use the newly fine-tuned weights.
+    """
+    global yolo_model
+    models_dir = os.path.join(os.path.dirname(__file__), 'models')
+    src = os.path.join(models_dir, 'best_feedback.pt')
+    dst = os.path.join(models_dir, 'best.pt')
+    if not os.path.exists(src):
+        return jsonify({"success": False, "message": "best_feedback.pt not found — run fine-tuning first"}), 404
+    import shutil
+    shutil.copy2(src, dst)
+    # Hot-reload YOLO
+    try:
+        from ultralytics import YOLO as _YOLO
+        yolo_model = _YOLO(dst)
+        yolo_model.to(DEVICE)
+        yolo_model.eval()
+        print(f"✅ YOLO hot-reloaded from promoted feedback weights on {DEVICE}", flush=True)
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Weights promoted but YOLO reload failed: {e}"}), 500
+    return jsonify({"success": True, "message": "best_feedback.pt promoted to best.pt and YOLO reloaded"})
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, threaded=True)

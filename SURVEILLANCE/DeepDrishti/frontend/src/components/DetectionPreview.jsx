@@ -16,16 +16,28 @@ const DetectionPreview = ({ detection, onUpdateDetection }) => {
   const [statusMsg, setStatusMsg] = useState(null);
   const [showNoteEditor, setShowNoteEditor] = useState(false);
   const [noteText, setNoteText] = useState(detection?.reviewNotes || '');
+  const [hitlCounts, setHitlCounts] = useState(null);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     setNoteText(detection?.reviewNotes || '');
     setStatusMsg(null);
     setShowNoteEditor(false);
+    setImgError(false);
   }, [detection?.id, detection?.reviewNotes]);
+
+  // Fetch HITL status once per detection open
+  useEffect(() => {
+    const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    axios.get(`${API_BASE.replace(/\/$/, '')}/detections/finetune/status`, { headers, timeout: 4000 })
+      .then(r => setHitlCounts(r.data))
+      .catch(() => {}); // silent
+  }, [detection?.id]);
 
   const showTempStatus = (msg) => {
     setStatusMsg(msg);
-    setTimeout(() => setStatusMsg(null), 4000);
+    setTimeout(() => setStatusMsg(null), 5000);
   };
 
   const normalizedStatus = String(detection?.status || '').toLowerCase().replace(/[\s_-]+/g, '');
@@ -54,9 +66,16 @@ const DetectionPreview = ({ detection, onUpdateDetection }) => {
   };
 
   const rawSnapshot = detection?.snapshotPath || detection?.enhancedImage || detection?.snapshot;
-  const snapshotUrl = rawSnapshot
+  const snapshotUrl = rawSnapshot && !imgError
     ? (rawSnapshot.startsWith('http') ? rawSnapshot : `${FLASK_STATIC_ORIGIN}${rawSnapshot.startsWith('/') ? '' : '/'}${rawSnapshot}`)
     : null;
+
+  const refreshHitl = async (headers) => {
+    try {
+      const r = await axios.get(`${API_BASE.replace(/\/$/, '')}/detections/finetune/status`, { headers, timeout: 4000 });
+      if (r?.data) setHitlCounts(r.data);
+    } catch (_) {}
+  };
 
   const handleMarkFalsePositive = async () => {
     if (!detection?.id || isSubmitting) return;
@@ -77,7 +96,8 @@ const DetectionPreview = ({ detection, onUpdateDetection }) => {
         reviewedAt: new Date().toISOString()
       };
       if (onUpdateDetection) onUpdateDetection(updated);
-      showTempStatus('Marked as FALSE POSITIVE (filter feedback saved)');
+      showTempStatus('⬛ Marked FALSE POSITIVE — HITL sample queued for YOLO training');
+      await refreshHitl(headers);
     } catch (err) {
       console.error('False positive error:', err);
       showTempStatus('Failed to update status');
@@ -105,7 +125,8 @@ const DetectionPreview = ({ detection, onUpdateDetection }) => {
         reviewedAt: new Date().toISOString()
       };
       if (onUpdateDetection) onUpdateDetection(updated);
-      showTempStatus('Detection CONFIRMED (threat logged to operations)');
+      showTempStatus('✅ Threat CONFIRMED — positive sample queued for YOLO fine-tuning');
+      await refreshHitl(headers);
     } catch (err) {
       console.error('Confirm error:', err);
       showTempStatus('Failed to update status');
@@ -178,6 +199,12 @@ const DetectionPreview = ({ detection, onUpdateDetection }) => {
 
   const badge = getStatusBadge();
 
+  // HITL counts display
+  const hitlTotal = hitlCounts?.counts?.total ?? hitlCounts?.total ?? null;
+  const hitlThreshold = hitlCounts?.threshold ?? 10;
+  const trainingActive = hitlCounts?.training_active ?? false;
+  const bestFeedbackReady = hitlCounts?.best_feedback_available ?? false;
+
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden">
       {/* Header */}
@@ -206,7 +233,7 @@ const DetectionPreview = ({ detection, onUpdateDetection }) => {
             Detected at {detection.timestamp ? new Date(detection.timestamp).toLocaleString() : '—'}
           </p>
           {statusMsg && (
-            <span className="text-[10px] text-primary animate-pulse font-mono">{statusMsg}</span>
+            <span className="text-[10px] text-primary animate-pulse font-mono max-w-[55%] text-right">{statusMsg}</span>
           )}
         </div>
       </div>
@@ -217,16 +244,18 @@ const DetectionPreview = ({ detection, onUpdateDetection }) => {
           <h4 className="text-[10px] font-bold uppercase text-slate-500">Camera Snapshot</h4>
           <div className="relative rounded border border-border-muted bg-slate-900 overflow-hidden aspect-video">
             {snapshotUrl ? (
-              <img 
+              <img
                 src={snapshotUrl}
                 alt={detection.objectDetected}
                 className="absolute inset-0 w-full h-full object-cover"
-                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                onError={() => setImgError(true)}
               />
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 text-slate-500">
                 <span className="material-symbols-outlined text-4xl mb-1 text-primary/60">videocam</span>
-                <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400">Live Frame Telemetry Logged</span>
+                <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 text-center px-4">
+                  {rawSnapshot ? 'Snapshot unavailable' : 'No snapshot — new detections auto-capture frame'}
+                </span>
               </div>
             )}
             <div className="absolute bottom-2 left-2 bg-background-dark/80 px-2 py-1 rounded border border-border-muted z-10">
@@ -275,12 +304,37 @@ const DetectionPreview = ({ detection, onUpdateDetection }) => {
               <div className="pt-2 border-t border-border-muted">
                 <span className="text-[9px] uppercase font-bold text-slate-500 block mb-1">Operator Notes:</span>
                 <p className="text-[11px] text-slate-300 italic bg-slate-900/60 p-2 rounded border border-border-muted">
-                  "{detection.reviewNotes}"
+                  &quot;{detection.reviewNotes}&quot;
                 </p>
               </div>
             )}
           </div>
         </div>
+
+        {/* HITL Active Learning Status */}
+        {hitlTotal !== null && (
+          <div className="bg-slate-900/60 border border-border-muted rounded p-2.5 space-y-1.5">
+            <div className="flex justify-between items-center">
+              <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">YOLO Active Learning</span>
+              {trainingActive && (
+                <span className="text-[9px] text-primary animate-pulse font-mono">⚙ TRAINING IN BACKGROUND…</span>
+              )}
+              {bestFeedbackReady && !trainingActive && (
+                <span className="text-[9px] text-green-400 font-mono">✓ Fine-tuned weights ready</span>
+              )}
+            </div>
+            <div className="w-full bg-slate-800 rounded-full h-1.5">
+              <div
+                className="bg-primary h-1.5 rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(100, (hitlTotal / hitlThreshold) * 100)}%` }}
+              />
+            </div>
+            <span className="text-[9px] text-slate-400 font-mono">
+              {hitlTotal}/{hitlThreshold} operator feedback samples
+              {hitlTotal >= hitlThreshold ? ' — auto fine-tuning triggered ✓' : ` — ${hitlThreshold - hitlTotal} more to trigger fine-tune`}
+            </span>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="space-y-2">
