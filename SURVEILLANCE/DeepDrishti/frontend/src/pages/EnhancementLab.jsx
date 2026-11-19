@@ -25,7 +25,6 @@ const PLACEHOLDER_IMPROVEMENTS = [
 const EnhancementLab = () => {
   const [enhancementMode, setEnhancementMode] = useState('HIGH QUALITY (V2.4)');
   const [viewMode, setViewMode] = useState('rgb');
-  const [sliderPosition, setSliderPosition] = useState(50);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [videoTimestamp, setVideoTimestamp] = useState(0);
@@ -43,8 +42,43 @@ const EnhancementLab = () => {
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.45);
   const [modelDetections, setModelDetections] = useState([]);
   const [modelImageDims, setModelImageDims] = useState({ width: null, height: null });
+  const [isRenderingVideo, setIsRenderingVideo] = useState(false);
+  const [renderedVideoUrl, setRenderedVideoUrl] = useState(null);
+  const [renderProgress, setRenderProgress] = useState(null);
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
+  const activeTrackedTargetsRef = useRef([]);
+
+  const mergeTrackedDetections = (newDetections, currentTimeSec) => {
+    const HOLD_DURATION_SEC = 3.5;
+    const now = typeof currentTimeSec === 'number' && currentTimeSec > 0 ? currentTimeSec : Date.now() / 1000;
+
+    let tracked = activeTrackedTargetsRef.current.filter(
+      (t) => (now - (t.lastSeen || 0)) < HOLD_DURATION_SEC
+    );
+
+    if (Array.isArray(newDetections) && newDetections.length > 0) {
+      newDetections.forEach((d) => {
+        const existingIdx = tracked.findIndex((t) => {
+          if (!t.bbox || !d.bbox) return false;
+          const dx = Math.abs(t.bbox[0] - d.bbox[0]);
+          const dy = Math.abs(t.bbox[1] - d.bbox[1]);
+          return dx < 80 && dy < 80;
+        });
+
+        if (existingIdx >= 0) {
+          tracked[existingIdx] = { ...d, lastSeen: now, isHeld: false };
+        } else {
+          tracked.push({ ...d, lastSeen: now, isHeld: false });
+        }
+      });
+    } else {
+      tracked = tracked.map((t) => ({ ...t, isHeld: true }));
+    }
+
+    activeTrackedTargetsRef.current = tracked;
+    return tracked;
+  };
 
   // Add styles for comparison slider
   React.useEffect(() => {
@@ -92,7 +126,6 @@ const EnhancementLab = () => {
 
   // Default images - removed dummy static images
   const defaultOriginalImage = null;
-  const defaultEnhancedImage = null;
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -121,6 +154,7 @@ const EnhancementLab = () => {
   };
 
   const resetState = () => {
+    activeTrackedTargetsRef.current = [];
     setEnhancedImage(null);
     setDepthImage(null);
     setDepthMetrics(null);
@@ -182,6 +216,42 @@ const EnhancementLab = () => {
     }
   };
 
+  const handleRenderFullVideo = async () => {
+    if (!selectedFile && !uploadedVideo) return;
+    try {
+      setIsRenderingVideo(true);
+      setError(null);
+      setRenderProgress('Processing video frames with FUNIE-GAN, YOLO, & MiDaS...');
+
+      const formData = new FormData();
+      if (selectedFile) {
+        formData.append('file', selectedFile);
+      } else if (uploadedVideo) {
+        formData.append('url', uploadedVideo);
+      }
+      formData.append('conf', String(confidenceThreshold));
+
+      const resp = await axios.post(`${FLASK_STATIC_ORIGIN}/render-video`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 300000,
+      });
+
+      if (resp.data?.success && resp.data.data?.video_url) {
+        const fullUrl = `${FLASK_STATIC_ORIGIN}${resp.data.data.video_url}`;
+        setRenderedVideoUrl(fullUrl);
+        setRenderProgress(`✅ Rendered ${resp.data.data.processed_frames} frames (${resp.data.data.total_detections} detections) in ${resp.data.data.processing_time_s}s`);
+      } else {
+        throw new Error(resp.data?.error || 'Video rendering failed');
+      }
+    } catch (err) {
+      console.error('Render error:', err);
+      setError(err.response?.data?.error || err.message || 'Video render failed');
+      setRenderProgress(null);
+    } finally {
+      setIsRenderingVideo(false);
+    }
+  };
+
   const updateUIWithResult = (payload) => {
     const enhancedImagePath = payload.enhancedImage;
     if (!enhancedImagePath) return;
@@ -205,7 +275,11 @@ const EnhancementLab = () => {
       setDepthMetrics(payload.depthMetrics);
     }
 
-    const detections = Array.isArray(payload.detections) ? payload.detections : [];
+    const rawDetections = Array.isArray(payload.detections) ? payload.detections : [];
+    const detections = (isVideoPlaying || uploadedVideo)
+      ? mergeTrackedDetections(rawDetections, videoRef.current?.currentTime)
+      : rawDetections;
+
     setModelDetections(detections);
     setModelImageDims({
       width: typeof payload.imageWidth === 'number' ? payload.imageWidth : null,
@@ -223,6 +297,7 @@ const EnhancementLab = () => {
         confidence: typeof d.confidence === 'number' ? `${Math.round(d.confidence * 100)}%` : '—',
         distance_m: typeof d.distance_m === 'number' ? d.distance_m : null,
         bbox: Array.isArray(d.bbox) ? d.bbox : null,
+        isHeld: Boolean(d.isHeld)
       }))
     );
   };
@@ -270,15 +345,7 @@ const EnhancementLab = () => {
     }, 'image/jpeg', 0.8);
   };
 
-  const handleSliderMouseMove = (e) => {
-    const rect = e.currentTarget.parentElement.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const percentage = (x / rect.width) * 100;
-    setSliderPosition(Math.max(0, Math.min(100, percentage)));
-  };
-
   const currentOriginalImage = uploadedImage || defaultOriginalImage;
-  const currentOriginalVideo = uploadedVideo;
   const currentEnhancedImage = enhancedImage;
 
   const enhancedVisualFilter =
@@ -301,15 +368,6 @@ const EnhancementLab = () => {
         : viewMode === 'rgb'
           ? 'none'
           : enhancedVisualFilter;
-
-  const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
-
-  const parseMetricNumber = (label) => {
-    const m = qualityMetrics.find((x) => x.name === label);
-    if (!m || m.value === '—') return null;
-    const v = parseFloat(String(m.value).replace(/[^0-9.-]/g, ''));
-    return Number.isFinite(v) ? v : null;
-  };
 
   const handleDetect = () => {
     if (!selectedFile && !uploadedImage) {
@@ -383,8 +441,40 @@ const EnhancementLab = () => {
                   disabled={isProcessing || isVideoPlaying || (!selectedFile && !uploadedImage)}
                   className="w-full h-11 bg-primary text-background-dark font-bold text-xs uppercase tracking-widest hover:brightness-110 transition-all rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isProcessing ? 'Processing...' : isVideoPlaying ? 'Video Analysis Live' : 'Run Enhancement'}
+                  {isProcessing ? 'Processing...' : isVideoPlaying ? 'Video Analysis Live' : uploadedVideo ? 'Option A: Live Stream Scrub' : 'Run Enhancement'}
                 </button>
+
+                {/* Option B: Full Video Batch Rendering & Export */}
+                {(uploadedVideo || selectedFile?.type?.startsWith('video/')) && (
+                  <div className="space-y-2 pt-2 border-t border-border-muted/60">
+                    <button
+                      type="button"
+                      onClick={handleRenderFullVideo}
+                      disabled={isRenderingVideo || isProcessing}
+                      className="w-full py-2.5 px-3 bg-amber-500/20 border border-amber-500/50 hover:bg-amber-500/30 text-amber-300 font-bold text-[10px] uppercase tracking-widest transition-all rounded disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      <span className="material-symbols-outlined text-sm">video_settings</span>
+                      {isRenderingVideo ? 'Rendering All Frames...' : 'Option B: Render Full Video'}
+                    </button>
+
+                    {renderProgress && (
+                      <p className="text-[9px] font-mono text-amber-400/90 bg-amber-950/30 p-2 rounded border border-amber-500/20">
+                        {renderProgress}
+                      </p>
+                    )}
+
+                    {renderedVideoUrl && (
+                      <a
+                        href={renderedVideoUrl}
+                        download={`deepdrishti_enhanced_${Date.now()}.mp4`}
+                        className="w-full py-2.5 px-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] uppercase tracking-widest transition-all rounded flex items-center justify-center gap-1.5 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+                      >
+                        <span className="material-symbols-outlined text-sm">download</span>
+                        Download Rendered MP4
+                      </a>
+                    )}
+                  </div>
+                )}
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Enhancement Mode</label>
@@ -504,13 +594,24 @@ const EnhancementLab = () => {
               {/* Enhanced Panel */}
               <div className="relative rounded border border-border-muted bg-slate-900 overflow-hidden aspect-video shrink-0">
                 <div className="absolute top-3 left-3 bg-primary/15 px-2 py-1 rounded border border-primary/30 z-20">
-                  <span className="text-[10px] font-mono uppercase text-primary">Enhanced</span>
+                  <span className="text-[10px] font-mono uppercase text-primary">
+                    {renderedVideoUrl ? 'Rendered MP4 (AI Overlays)' : 'Enhanced'}
+                  </span>
                 </div>
-                {currentEnhancedImage ? (
-                  <img
-                    src={currentEnhancedImage}
-                    alt="Enhanced output"
+                {renderedVideoUrl ? (
+                  <video
+                    src={renderedVideoUrl}
+                    controls
+                    autoPlay
+                    loop
                     className="w-full h-full object-cover"
+                  />
+                ) : currentEnhancedImage ? (
+                  <img
+                    src={viewMode === 'depth' && depthImage ? depthImage : currentEnhancedImage}
+                    alt={viewMode === 'depth' ? 'MiDaS Depth Map' : 'Enhanced output'}
+                    className="w-full h-full object-cover transition-all"
+                    style={{ filter: viewMode !== 'depth' ? enhancedVisualFilter : 'none' }}
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
@@ -525,15 +626,18 @@ const EnhancementLab = () => {
               {/* Detected Panel */}
               <div className="relative rounded border border-border-muted bg-slate-900 overflow-hidden aspect-video shrink-0">
                 <div className="absolute top-3 left-3 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/30 z-20">
-                  <span className="text-[10px] font-mono uppercase text-emerald-300">Detected</span>
+                  <span className="text-[10px] font-mono uppercase text-emerald-300">
+                    {viewMode === 'depth' ? 'MiDaS Depth Map' : 'Detected'}
+                  </span>
                 </div>
 
                 {currentEnhancedImage ? (
                   <>
                     <img
-                      src={currentEnhancedImage}
-                      alt="Detected overlay"
-                      className="w-full h-full object-cover"
+                      src={rightSideSource}
+                      alt={viewMode === 'depth' ? 'MiDaS Depth Map' : 'Detected overlay'}
+                      className="w-full h-full object-cover transition-all"
+                      style={{ filter: rightSideFilter }}
                     />
 
                     {Array.isArray(modelDetections) && modelDetections.length > 0 && (
@@ -560,12 +664,12 @@ const EnhancementLab = () => {
                                   ? 'border-emerald-400/90 shadow-[0_0_10px_rgba(52,211,153,0.3)]'
                                   : 'border-cyan-400/90 shadow-[0_0_10px_rgba(6,182,212,0.3)]';
 
-                          const label = `${d.class || d.raw_class || 'unknown'} • ${status}${typeof d.distance_m === 'number' ? ` • ${d.distance_m}m` : ''}`;
+                          const label = `${d.class || d.raw_class || 'unknown'} • ${status}${typeof d.distance_m === 'number' ? ` • ${d.distance_m}m` : ''}${d.isHeld ? ' [TRACKED]' : ''}`;
 
                           return (
                             <div
                               key={`${idx}`}
-                              className={`absolute border-2 ${borderClass}`}
+                              className={`absolute border-2 ${borderClass} ${d.isHeld ? 'border-dashed opacity-85' : ''}`}
                               style={{ left: `${left}%`, top: `${top}%`, width: `${width}%`, height: `${height}%` }}
                             >
                               <div className="absolute -top-6 left-0 bg-background-dark/85 border border-border-muted px-2 py-0.5 text-[10px] font-mono text-slate-100 whitespace-nowrap">

@@ -8,7 +8,7 @@ require('dotenv').config();
 const sampleFeeds = [
   {
     title: 'Coral Reef Monitoring Camera',
-    url: 'https://www.youtube.com/embed/6zrn4-FfbXw',
+    url: 'https://www.youtube.com/embed/og8bbxl0iW8?rel=0&start=0&end=120&loop=1&playlist=og8bbxl0iW8',
     status: 'active',
     location: 'Great Barrier Reef',
     sector: 'Sector Alpha',
@@ -17,8 +17,8 @@ const sampleFeeds = [
     description: 'Monitoring coral reef health and marine life activity'
   },
   {
-    title: 'Deep Sea Exploration Feed',
-    url: 'https://www.youtube.com/embed/1Vd2b8sN0Dc',
+    title: 'Deep Sea Exploration Feed (Local)',
+    url: '/videos/feed-local-a.mp4',
     status: 'active',
     location: 'Mariana Trench Region',
     sector: 'Sector Beta',
@@ -27,8 +27,8 @@ const sampleFeeds = [
     description: 'Deep sea surveillance for unusual geological activity'
   },
   {
-    title: 'Coastal Security Camera',
-    url: 'https://www.youtube.com/embed/mx6gK6z0x0g',
+    title: 'Coastal Security Camera (Local)',
+    url: '/videos/feed-local-b.mp4',
     status: 'active',
     location: 'Naval Base Entrance',
     sector: 'Sector Gamma',
@@ -38,7 +38,7 @@ const sampleFeeds = [
   },
   {
     title: 'Underwater Pipeline Monitor',
-    url: 'https://www.youtube.com/embed/2OEL4P1Rz04',
+    url: 'https://www.youtube.com/embed/jzx_n25g3kA?rel=0&start=0&end=120&loop=1&playlist=jzx_n25g3kA',
     status: 'active',
     location: 'Subsea Pipeline Route',
     sector: 'Sector Delta',

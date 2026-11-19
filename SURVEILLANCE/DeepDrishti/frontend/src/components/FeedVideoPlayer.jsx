@@ -78,7 +78,8 @@ const FeedVideoPlayer = forwardRef(function FeedVideoPlayer(
         muted
         playsInline
         autoPlay={!paused}
-        controls
+        controls={false}
+        style={{ objectFit: 'cover', width: '100%', height: '100%' }}
       />
     );
   }

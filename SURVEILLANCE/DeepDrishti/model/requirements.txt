@@ -13,3 +13,6 @@ timm>=1.0.0
 
 Pillow>=11.1.0
 Werkzeug>=2.3.7
+
+# Video stream extraction (required by app.py for YouTube/stream sources)
+yt-dlp>=2024.11.4

@@ -106,13 +106,22 @@ OUTPUT_FOLDER = 'outputs'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'tiff', 'bmp'}
 FUNIE_MODEL_PATH = 'models/funie_final_improved.pth'
 YOLO_MODEL_PATH = 'models/best.pt'
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+# --- Device selection: GPU preferred, CPU fallback ---
+if torch.cuda.is_available():
+    DEVICE = torch.device('cuda')
+    _gpu_name = torch.cuda.get_device_name(0)
+    _gpu_mem  = round(torch.cuda.get_device_properties(0).total_memory / 1024**3, 1)
+    print(f"🟢 GPU detected: {_gpu_name} ({_gpu_mem} GB VRAM) — all models will run on CUDA", flush=True)
+else:
+    DEVICE = torch.device('cpu')
+    print("🟡 No CUDA GPU detected — all models will run on CPU", flush=True)
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 # -------------------- MODEL LOAD --------------------
-print(f"🔄 Loading models on {DEVICE}...")
+print(f"🔄 Loading surveillance models on device: {DEVICE} ...", flush=True)
 
 # 1. Load FUNIE-GAN
 try:
@@ -126,17 +135,19 @@ try:
         }
     funie_model.load_state_dict(_ckpt, strict=False)
     funie_model.eval()
-    print("✅ FUNIE-GAN loaded")
+    print(f"✅ FUNIE-GAN loaded on {DEVICE}", flush=True)
 except Exception as e:
-    print(f"❌ FUNIE-GAN loading failed: {e}")
+    print(f"❌ FUNIE-GAN loading failed: {e}", flush=True)
     funie_model = None
 
-# 2. Load YOLO
+# 2. Load YOLO — explicitly set device so it runs on GPU when available
 try:
     yolo_model = YOLO(YOLO_MODEL_PATH)
-    print("✅ YOLO loaded")
+    # Move YOLO to the selected device (CUDA or CPU)
+    yolo_model.to(DEVICE)
+    print(f"✅ YOLO loaded on {DEVICE}", flush=True)
 except Exception as e:
-    print(f"❌ YOLO loading failed: {e}")
+    print(f"❌ YOLO loading failed: {e}", flush=True)
     yolo_model = None
 
 # 3. Load MiDaS
@@ -146,10 +157,12 @@ try:
     midas.eval()
     midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms", trust_repo=True)
     midas_transform = midas_transforms.small_transform
-    print("✅ MiDaS loaded", flush=True)
+    print(f"✅ MiDaS loaded on {DEVICE}", flush=True)
 except Exception as e:
     print(f"❌ MiDaS loading failed: {e}", flush=True)
     midas = None
+
+print(f"📊 Model load summary → FUNIE-GAN: {'✅' if funie_model else '❌'}  YOLO: {'✅' if yolo_model else '❌'}  MiDaS: {'✅' if midas else '❌'}  Device: {DEVICE}", flush=True)
 
 # -------------------- HELPERS --------------------
 danger_map = {
@@ -296,7 +309,9 @@ def health():
             "yolo": yolo_model is not None,
             "midas": midas is not None
         },
-        "device": str(DEVICE)
+        "device": str(DEVICE),
+        "cuda_available": torch.cuda.is_available(),
+        "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
     })
 
 @app.route('/', methods=['GET'])
@@ -443,6 +458,7 @@ def pipeline():
 
     # 2. MiDaS Monocular Depth Estimation
     depth_map = None
+    depth_unavailable_reason = None
     if midas:
         try:
             input_batch = midas_transform(enhanced_cv).to(DEVICE)
@@ -462,8 +478,13 @@ def pipeline():
                 "status": "OPERATIONAL"
             }
         except Exception as depth_err:
+            depth_unavailable_reason = str(depth_err)
             print(f"⚠️ MiDaS depth computation warning: {depth_err}", flush=True)
             depth_map = None
+            metrics['depth'] = {"status": "UNAVAILABLE", "reason": depth_unavailable_reason}
+    else:
+        depth_unavailable_reason = "MiDaS model not loaded"
+        metrics['depth'] = {"status": "UNAVAILABLE", "reason": depth_unavailable_reason}
 
     # 3. YOLO Detection
     detections = []
@@ -481,22 +502,25 @@ def pipeline():
             base_conf = float(req_conf) if req_conf is not None else 0.45
         except (ValueError, TypeError):
             base_conf = 0.45
-        base_conf = max(0.20, min(0.95, base_conf))
+        base_conf = max(0.15, min(0.95, base_conf))
 
-        # Class-specific minimum threshold rules to eliminate seabed / coral / water noise
+        # Class-specific default minimum threshold rules to eliminate seabed / coral / water noise
         CLASS_MIN_CONF = {
-            'mine': 0.48,        # Sea mines must be high confidence to avoid coral false alarms
-            'submarine': 0.50,   # Submarines must be clear to avoid reef ridge false alarms
-            'human': 0.50,       # Diver/human
-            'structure': 0.40,   # Underwater pipes/structures
-            'trash': 0.40,       # Marine debris
-            'fish': 0.35,        # Marine life
+            'mine': 0.40,        # Sea mines
+            'submarine': 0.40,   # Submarines
+            'human': 0.35,       # Diver/human
+            'structure': 0.35,   # Underwater pipes/structures
+            'trash': 0.35,       # Marine debris
+            'fish': 0.30,        # Marine life
         }
+
+        # If user explicitly requested a confidence (e.g. from the UI slider), honor their slider value
+        is_user_slider = req_conf is not None
 
         # Predict with IoU threshold 0.45 to suppress redundant duplicate boxes
         results = yolo_model.predict(
             enhanced_cv,
-            conf=min(base_conf, 0.35),
+            conf=min(base_conf, 0.25),
             iou=0.45,
             verbose=False
         )[0]
@@ -508,9 +532,12 @@ def pipeline():
             name = yolo_model.names.get(cls_id, 'unknown')
             lower_name = name.lower()
 
-            # Class-specific confidence filtering
-            min_thresh = CLASS_MIN_CONF.get(lower_name, 0.45)
-            effective_thresh = max(base_conf, min_thresh)
+            # If user explicitly adjusted the slider, respect it; otherwise use class minimum default
+            if is_user_slider:
+                effective_thresh = base_conf
+            else:
+                effective_thresh = max(base_conf, CLASS_MIN_CONF.get(lower_name, 0.35))
+
             if conf < effective_thresh:
                 continue
 
@@ -522,8 +549,8 @@ def pipeline():
             image_area = max(1, W * H)
             area_ratio = box_area / image_area
 
-            # Discard full-frame background false positives (>60% of image area) unless confidence is extremely high
-            if area_ratio > 0.60 and conf < 0.85:
+            # Discard obvious full-frame background false positives (>98% of image area) with low confidence
+            if area_ratio > 0.98 and conf < 0.50:
                 continue
 
             # Discard microscopic noise / speck artifacts (< 0.05% of image area) with borderline confidence
@@ -538,11 +565,6 @@ def pipeline():
             # Submarines are elongated horizontally or distinct hulls
             if "sub" in lower_name:
                 if (box_h / box_w) > 2.5 and conf < 0.70:
-                    continue
-
-            # Marine life shouldn't be covering the entire camera unless extraordinary confidence
-            if any(k in lower_name for k in ["fish", "marine_life"]):
-                if area_ratio > 0.40 and conf < 0.80:
                     continue
             
             # Map YOLO classes to specific marine threat labels
@@ -638,6 +660,7 @@ def pipeline():
             "image_height": int(enhanced_cv.shape[0]) if enhanced_cv is not None else None,
             "metrics": metrics,
             "detections": detections,
+            "depth_available": depth_map is not None,
             "processing_time_ms": round((time.time() - start_time) * 1000, 2),
             "model_device": str(DEVICE)
         }
@@ -650,6 +673,107 @@ def serve_output(filename):
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
     return response
+
+@app.route('/render-video', methods=['POST'])
+def render_video():
+    """
+    Renders an entire input video file into a continuous enhanced MP4 file
+    with color/contrast enhancement, YOLO threat bounding boxes, and tactical HUD.
+    """
+    start_time = time.time()
+    input_video_path = None
+    temp_input = False
+
+    if 'file' in request.files or 'video' in request.files:
+        f = request.files.get('file') or request.files.get('video')
+        ext = os.path.splitext(secure_filename(f.filename))[1] or '.mp4'
+        input_video_path = os.path.join(UPLOAD_FOLDER, f"input_render_{uuid.uuid4().hex[:8]}{ext}")
+        f.save(input_video_path)
+        temp_input = True
+    elif request.is_json:
+        url = request.json.get('url')
+        video_path = request.json.get('videoPath')
+        if video_path and os.path.exists(video_path):
+            input_video_path = video_path
+        elif url:
+            possible = [
+                os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'public', url.lstrip('/'))),
+                os.path.abspath(os.path.join(os.getcwd(), '..', 'frontend', 'public', url.lstrip('/'))),
+                url
+            ]
+            for p in possible:
+                if os.path.exists(p):
+                    input_video_path = p
+                    break
+
+    if not input_video_path or not os.path.exists(input_video_path):
+        return jsonify({"error": "No valid video file provided"}), 400
+
+    cap = cv2.VideoCapture(input_video_path)
+    if not cap.isOpened():
+        return jsonify({"error": "Failed to open video file"}), 400
+
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 100
+    orig_fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 640
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 480
+
+    unique_token = uuid.uuid4().hex[:8]
+    timestamp = int(time.time())
+    out_filename = f"rendered_tactical_{timestamp}_{unique_token}.mp4"
+    out_path = os.path.join(OUTPUT_FOLDER, out_filename)
+
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out_writer = cv2.VideoWriter(out_path, fourcc, orig_fps, (width, height))
+
+    frame_idx = 0
+    total_detections_count = 0
+    max_frames = min(total_frames, 900)
+
+    while frame_idx < max_frames:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        enhanced = apply_color_balance(frame)
+        enhanced = unsharp_mask(enhanced, amount=1.1, radius=1.0, threshold=1)
+
+        if yolo_model:
+            results = yolo_model.predict(enhanced, conf=0.30, iou=0.45, verbose=False)[0]
+            for box in results.boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                cls_id = int(box.cls[0])
+                conf = float(box.conf[0])
+                name = yolo_model.names.get(cls_id, 'unknown').upper()
+                color = (0, 0, 255) if name in ['MINE', 'SUBMARINE', 'HUMAN'] else (0, 255, 0) if name in ['FISH'] else (0, 212, 255)
+                cv2.rectangle(enhanced, (x1, y1), (x2, y2), color, 2)
+                label_text = f"{name} {int(conf*100)}%"
+                cv2.rectangle(enhanced, (x1, max(0, y1 - 18)), (x1 + len(label_text)*9, y1), color, -1)
+                cv2.putText(enhanced, label_text, (x1 + 2, y1 - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 1, cv2.LINE_AA)
+                total_detections_count += 1
+
+        cv2.putText(enhanced, f"DEEP-DRISHTI AI | FRAME {frame_idx}/{total_frames}", (15, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 212, 255), 1, cv2.LINE_AA)
+        out_writer.write(enhanced)
+        frame_idx += 1
+
+    cap.release()
+    out_writer.release()
+
+    if temp_input and os.path.exists(input_video_path):
+        try: os.remove(input_video_path)
+        except Exception: pass
+
+    return jsonify({
+        "success": True,
+        "data": {
+            "video_url": f"/outputs/{out_filename}",
+            "filename": out_filename,
+            "processed_frames": frame_idx,
+            "total_detections": total_detections_count,
+            "processing_time_s": round(time.time() - start_time, 2),
+            "model_device": str(DEVICE)
+        }
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, threaded=True)

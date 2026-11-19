@@ -5,6 +5,7 @@ const FormData = require('form-data');
 const fs = require('fs');
 const Enhancement = require('../models/Enhancement');
 const Detection = require('../models/Detection');
+const SystemLog = require('../models/SystemLog');
 const { buildEnhancementLabMetrics } = require('../utils/enhancementLabMetrics');
 
 const router = express.Router();
@@ -168,6 +169,24 @@ const aiEnhanceMedia = async (req, res, next) => {
           })),
           { ordered: false }
         );
+
+        // Log critical threats to System Logs collection for operator visibility
+        const threats = flaskDetections.filter(d => ['DANGER', 'WARNING'].includes(String(d.status || '').toUpperCase()));
+        if (threats.length > 0) {
+          const topThreat = threats[0];
+          await SystemLog.create({
+            severity: topThreat.status === 'DANGER' ? 'CRIT' : 'WARN',
+            module: 'AI_DETECTION_ENGINE',
+            message: `Threat identified in media stream: ${topThreat.class || topThreat.raw_class} (${Math.round((topThreat.confidence || 0) * 100)}% conf) at range ${topThreat.distance_m ?? 'N/A'}m.`,
+            meta: {
+              threatClass: topThreat.class || topThreat.raw_class,
+              confidence: topThreat.confidence,
+              distance_m: topThreat.distance_m,
+              source: originalName || 'MEDIA_STREAM',
+              timestamp: new Date()
+            }
+          }).catch(logErr => console.warn('Could not write system log:', logErr.message));
+        }
       }
     } catch (detPersistErr) {
       console.warn('⚠️ Could not persist detection records for Enhancement Lab:', detPersistErr.message);

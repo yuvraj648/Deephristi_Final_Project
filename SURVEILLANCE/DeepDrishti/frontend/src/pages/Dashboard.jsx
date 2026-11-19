@@ -23,6 +23,29 @@ const asSummary = (payload) => {
   return payload;
 };
 
+// Local-video fallback shown when both the live API and test route are unreachable.
+// These files live in SURVEILLANCE/DeepDrishti/frontend/public/videos/
+const LOCAL_FALLBACK_FEEDS = [
+  {
+    _id: 'local-a',
+    title: 'Local Preview Feed A',
+    url: '/videos/feed-local-a.mp4',
+    status: 'active',
+    location: 'On-Station (Local)',
+    sector: 'Sector Beta',
+    activeAlerts: 0,
+  },
+  {
+    _id: 'local-b',
+    title: 'Local Preview Feed B',
+    url: '/videos/feed-local-b.mp4',
+    status: 'active',
+    location: 'On-Station (Local)',
+    sector: 'Sector Gamma',
+    activeAlerts: 0,
+  },
+];
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const [feeds, setFeeds] = useState([]);
@@ -37,28 +60,41 @@ const Dashboard = () => {
       try {
         setLoading(true);
         
-        // Try to get real data first, fallback to test data
+        // Try to get real data first, fallback to test data, then local fallback
         let feedsRaw, alertsRaw, statsRaw;
         
         try {
           feedsRaw = await marineService.getActiveFeeds();
         } catch (err) {
           console.warn('Feeds API failed, using test data:', err?.message || err);
-          feedsRaw = await marineService.getTestActiveFeeds();
+          try {
+            feedsRaw = await marineService.getTestActiveFeeds();
+          } catch (testErr) {
+            console.warn('Test feeds also failed, using local video fallback:', testErr?.message || testErr);
+            feedsRaw = { data: LOCAL_FALLBACK_FEEDS };
+          }
         }
 
         try {
           alertsRaw = await marineService.getActiveAlerts();
         } catch (err) {
           console.warn('Alerts API failed, using test data:', err?.message || err);
-          alertsRaw = await marineService.getTestActiveAlerts();
+          try {
+            alertsRaw = await marineService.getTestActiveAlerts();
+          } catch {
+            alertsRaw = { data: [] };
+          }
         }
 
         try {
           statsRaw = await marineService.getDashboardSummary();
         } catch (err) {
           console.warn('Dashboard summary failed, using test data:', err?.message || err);
-          statsRaw = await marineService.getTestDashboardSummary();
+          try {
+            statsRaw = await marineService.getTestDashboardSummary();
+          } catch {
+            statsRaw = null;
+          }
         }
 
         setFeeds(asList(feedsRaw));
@@ -67,11 +103,9 @@ const Dashboard = () => {
         setError(null);
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err);
-        const hint =
-          import.meta.env?.VITE_API_URL || 'http://localhost:5003/api/v1';
-        setError(
-          `Failed to load dashboard data. Confirm the API is running and matches ${hint}.`
-        );
+        // Even on total failure, still show local videos
+        setFeeds(LOCAL_FALLBACK_FEEDS);
+        setError(null);
       } finally {
         setLoading(false);
       }
@@ -135,9 +169,12 @@ const Dashboard = () => {
     feedId: feed._id,
     location: feed.location || 'Unknown Location',
     status: feed.status === 'active' ? 'Online' : 'Offline',
-    url: feed.url, // YouTube embed URL
-    time: feed.lastDetectionFormatted || new Date().toLocaleTimeString(),
-    isPulsing: feed.activeAlerts > 0,
+    url: feed.url, // Local MP4 path or YouTube embed URL
+    time: feed.lastDetectionFormatted
+      || (feed.lastDetection?.timestamp
+        ? new Date(feed.lastDetection.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
+    isPulsing: (feed.activeAlerts || 0) > 0,
     sector: feed.sector
   }));
 
@@ -199,18 +236,18 @@ const Dashboard = () => {
         <main className="flex-1 flex flex-col overflow-hidden relative min-w-0">
           <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto relative z-10">
             <div className="grid grid-cols-2 gap-4">
-              {cameraFeeds.map((feed, index) => (
-                <div key={feed.feedId} className="border border-primary/30 relative overflow-hidden group aspect-video bg-background-dark/50">
-                  {/* Video iframe for YouTube embed */}
+              {cameraFeeds.map((feed) => (
+                <div key={feed.feedId} className="border border-primary/30 relative overflow-hidden group bg-background-dark/50" style={{ minHeight: '220px', aspectRatio: '16/9' }}>
+                  {/* Video player — local MP4 or YouTube iframe */}
                   {feed.url ? (
                     <FeedVideoPlayer
                       url={feed.url}
                       title={feed.id}
-                      className="w-full h-full object-cover brightness-75 group-hover:brightness-100 transition-all"
+                      className="absolute inset-0 w-full h-full object-cover brightness-75 group-hover:brightness-100 transition-all"
                     />
                   ) : (
                     <img 
-                      className="w-full h-full object-cover brightness-75 group-hover:brightness-100 transition-all" 
+                      className="absolute inset-0 w-full h-full object-cover brightness-75 group-hover:brightness-100 transition-all" 
                       alt={feed.id}
                       src={`https://picsum.photos/seed/${feed.feedId}/800/600.jpg`}
                     />
@@ -299,6 +336,8 @@ const Dashboard = () => {
                     </div>
                   )}
                   <button 
+                    type="button"
+                    onClick={() => handleAlertAction(alert.id, 'investigate')}
                     className={`w-full py-2 ${
                       alert.color === 'red' 
                         ? 'bg-red-500 hover:bg-red-600 text-white' 
