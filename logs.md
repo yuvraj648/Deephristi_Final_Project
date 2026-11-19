@@ -316,3 +316,18 @@ All five local endpoints returned HTTP 200 during the verification on 2026-11-18
 - Browser verified the initial hero, the first scroll transition and video scrubbing, the platform CTA, mobile poster mode, and reduced-motion mode.
 - Vite development server is running at `http://127.0.0.1:5173/`.
 - Installing GSAP reported 13 dependency audit advisories (1 moderate, 12 high); no automatic dependency fixes were applied.
+
+## 17. 2026-11-18 - Smoother cinematic video scrubbing
+
+### Changes
+
+- Generated `deepdrishti-exploration-60fps.mp4` from the supplied 24 FPS source using motion-compensated frame interpolation. The result is 1280×720 at 60 FPS, 596 frames, and 9.93 seconds; the original video remains unchanged.
+- Switched the desktop hero to the interpolated video. Existing compact-device and reduced-motion behavior still uses the poster instead.
+- Smoothed ScrollTrigger progress through a 0.24-second GSAP interpolation and increased video seek updates to a maximum of 30 per second, with a one-frame seek threshold to reduce visible jumps without seeking on every animation frame.
+
+### Validation
+
+- The local page at `http://127.0.0.1:5173/` returned HTTP 200. Browser inspection confirmed the new video loaded at 1280×720 and 9.93 seconds; scrolling advanced the progress indicator, narrative scene, and video time.
+- `npm.cmd run lint` passed with pre-existing warnings in unrelated files.
+- `npx.cmd vite build` passed with existing chunk-size and dynamic-import warnings.
+- `npm.cmd run build` remains blocked by pre-existing unused imports in `AsvExplorerPage.tsx`, `ComparePage.tsx`, `NoveltyPage.tsx`, and `ReportPage.tsx`; it reported no errors in the hero changes.

@@ -67,6 +67,9 @@ const VIDEO_SCRUB_STOPS = [
   { scroll: 1, video: 1 },
 ];
 
+const VIDEO_SEEK_INTERVAL_MS = 1000 / 30;
+const VIDEO_SEEK_THRESHOLD_SECONDS = 1 / 60;
+
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
@@ -141,10 +144,10 @@ export const HeroPage: React.FC<HeroPageProps> = ({ onEnterPlatform }) => {
         video &&
         video.readyState >= HTMLMediaElement.HAVE_METADATA &&
         !video.seeking &&
-        now - lastVideoSeekRef.current >= 85
+        now - lastVideoSeekRef.current >= VIDEO_SEEK_INTERVAL_MS
       ) {
         const targetTime = getVideoProgress(progress) * video.duration;
-        if (Math.abs(video.currentTime - targetTime) > 0.08) {
+        if (Math.abs(video.currentTime - targetTime) > VIDEO_SEEK_THRESHOLD_SECONDS) {
           video.currentTime = targetTime;
           lastVideoSeekRef.current = now;
         }
@@ -157,6 +160,12 @@ export const HeroPage: React.FC<HeroPageProps> = ({ onEnterPlatform }) => {
     const updateReducedMotion = () => setPrefersReducedMotion(reducedMotionQuery.matches);
     const updateExperienceSize = () => setIsStaticExperience(prefersStaticExperience());
     const track = trackRef.current;
+    const progressProxy = { value: 0 };
+    const smoothProgress = gsap.quickTo(progressProxy, 'value', {
+      duration: 0.24,
+      ease: 'power2.out',
+      onUpdate: () => updateScrollProgress(progressProxy.value),
+    });
 
     updateReducedMotion();
     window.addEventListener('resize', updateExperienceSize);
@@ -167,8 +176,11 @@ export const HeroPage: React.FC<HeroPageProps> = ({ onEnterPlatform }) => {
           trigger: track,
           start: 'top top',
           end: 'bottom bottom',
-          onUpdate: (self) => updateScrollProgress(self.progress),
-          onRefresh: (self) => updateScrollProgress(self.progress),
+          onUpdate: (self) => smoothProgress(self.progress),
+          onRefresh: (self) => {
+            progressProxy.value = self.progress;
+            updateScrollProgress(self.progress);
+          },
         })
       : null;
 
@@ -176,6 +188,7 @@ export const HeroPage: React.FC<HeroPageProps> = ({ onEnterPlatform }) => {
       window.removeEventListener('resize', updateExperienceSize);
       reducedMotionQuery.removeEventListener('change', updateReducedMotion);
       scrollTrigger?.kill();
+      gsap.killTweensOf(progressProxy);
       if (frameRef.current !== null) {
         window.cancelAnimationFrame(frameRef.current);
         frameRef.current = null;
@@ -217,7 +230,7 @@ export const HeroPage: React.FC<HeroPageProps> = ({ onEnterPlatform }) => {
           <video
             ref={videoRef}
             className="hero-video"
-            src="/videos/deepdrishti-exploration.mp4"
+            src="/videos/deepdrishti-exploration-60fps.mp4"
             poster="/images/deepdrishti-exploration-poster.jpg"
             preload="metadata"
             muted
