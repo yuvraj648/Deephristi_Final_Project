@@ -59,23 +59,35 @@ export const SiteDetailDrawer: React.FC = () => {
             eyebrow="Observed ASVs"
             value={profile.asvCount}
             meta={`n = ${profile.sampleIds.length} samples`}
+            meaning="The number of unique, error-corrected DNA sequence variants (ASVs) recovered from this station's water samples."
+            formula="ASV Count = Count of distinct genetic barcode sequences detected"
+            interpretation="Higher counts indicate high genetic variation and microbial richness in the water column at this station."
           />
           <KPICard
             eyebrow="Taxa Detected"
             value={profile.taxaCount}
             meta="taxonomic breadth"
+            meaning="The total number of distinct biological species or groups positively identified by our AI models at this site."
+            formula="Taxa Count = Number of unique biological classifications at this station"
+            interpretation="Reflects the variety of distinct living organisms coexisting at this specific GPS location and depth."
           />
           <KPICard
             eyebrow="Shannon Diversity"
             value={profile.shannon}
             unit="H'"
             meta="information index"
+            meaning="Measures the community diversity and population balance at this station. Takes into account both the number of species and their relative abundances."
+            formula="H' = - Sum [ (Species Share) × ln(Species Share) ]"
+            interpretation="Higher values (>2.0) represent a diverse, stable community with balanced populations. Low values (<1.0) mean one dominant species comprises most of the DNA."
           />
           <KPICard
             eyebrow="Simpson Index"
             value={profile.simpson}
             unit="1 - D"
             meta="dominance weight"
+            meaning="The probability (from 0 to 1) that two randomly selected DNA reads belong to completely different species."
+            formula="1 - D = 1 - Sum [ (Species Share)² ]"
+            interpretation="Values near 1.0 indicate high evenness and resistance to dominance. Values near 0 indicate that a single species monopolizes this sampling layer."
           />
         </div>
 

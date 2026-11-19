@@ -577,36 +577,36 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
           eyebrow={`Taxa Richness (${filters.taxonomicRank})`}
           value={kpis.taxaDetected}
           meta={`${kpis.siteCount} stations sampled`}
-          meaning="Total unique biological taxa classified at the active taxonomic rank across sampled hydrographic stations."
-          formula="Taxa Count = Count of unique taxonomic names at active rank"
-          interpretation="Indicates broad phylogenetic richness and taxonomic variety across sampled ocean stations."
+          meaning="The total number of different biological groups (species, families, or classes) detected in this survey. It counts how many distinct branches of life are present in the sampled water."
+          formula="Richness (S) = Count of distinct unique taxonomic names detected at the chosen rank"
+          interpretation="Higher numbers indicate a vibrant, biodiverse marine habitat supporting many different kinds of organisms. Lower numbers can signify environmental stress, pollution, or extreme ocean conditions (e.g. oxygen-depleted zones)."
         />
         <KPICard
           eyebrow="Shannon Diversity"
           value={kpis.shannonDiversity}
           unit="H'"
           meta="pooled regional diversity"
-          meaning="Information-theoretic entropy index (H') quantifying biological community richness and relative abundance equitability."
-          formula="H' = - Σ [ p_i × ln(p_i) ]"
-          interpretation="Higher H' reflects a healthy, mature marine ecosystem where reads are evenly distributed across taxa."
+          meaning="Measures both how many species are present AND how evenly their population numbers are balanced. It prevents an area where 99% of reads belong to one fish from looking artificially diverse."
+          formula="H' = - Sum [ (Taxon Population Share) × Natural Log (Taxon Population Share) ]"
+          interpretation="Values usually range between 1.5 and 4.0+. A score above 2.5 means a thriving, well-balanced marine ecosystem where multiple species flourish together. A low score (<1.5) points to an imbalance, like a single algae species taking over (algal bloom)."
         />
         <KPICard
           eyebrow="Candidate Divergent Lineages"
           value={kpis.potentiallyUnknownGroups}
           divergent={kpis.potentiallyUnknownGroups > 0}
           meta={`${expedition.clusters.length} diagnostic clusters`}
-          meaning="Candidate evolutionary lineages exhibiting >12% nucleotide divergence from published SILVA/NCBI reference barcodes."
-          formula="Divergence Distance = min ||Latent_Vector - Known_Centroid|| > 7.78"
-          interpretation="Identifies potentially newly discovered or undocumented deep-sea organisms requiring physical specimen validation."
+          meaning="Water DNA sequences that differ significantly (>12% genetic divergence) from all documented species in global scientific gene banks (NCBI GenBank and SILVA)."
+          formula="Novelty Check = Genetic Distance from nearest known species reference center > 7.78 threshold"
+          interpretation="Points to exciting potential new species, deep-sea abyss organisms, or uncataloged marine microbes that science has never formally recorded. These represent top candidates for laboratory physical specimen discovery."
         />
         <KPICard
           eyebrow="Linnaean Resolution Depth"
           value="7 / 7"
           unit="ranks"
           meta="Kingdom → Species 100% complete"
-          meaning="Complete 7-level taxonomic classification resolved across all cataloged marine amplicon sequence variants."
-          formula="Kingdom → Phylum → Class → Order → Family → Genus → Species"
-          interpretation="Full 7-level Linnaean resolution ensures complete, authoritative taxonomic lineages with zero blank ranks."
+          meaning="Shows how far down the biological tree of life our AI models successfully classified the environmental DNA—all the way from broad Kingdom down to individual Species."
+          formula="Hierarchy Path: Kingdom → Phylum → Class → Order → Family → Genus → Species (All 7 levels resolved)"
+          interpretation="A perfect 7 / 7 score means every identified organism has a complete scientific family tree without any missing or blank ranks, providing high taxonomic confidence for conservationists and marine researchers."
         />
       </div>
 

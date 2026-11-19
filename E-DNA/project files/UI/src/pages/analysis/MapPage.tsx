@@ -173,10 +173,40 @@ export const MapPage: React.FC = () => {
 
                   {/* Station Biodiversity Metrics */}
                   <div className="grid grid-cols-2 gap-2">
-                    <KPICard eyebrow="ASVs" value={activeProfile.asvCount} />
-                    <KPICard eyebrow="Taxa" value={activeProfile.taxaCount} />
-                    <KPICard eyebrow="Shannon" value={activeProfile.shannon} unit="H'" />
-                    <KPICard eyebrow="Simpson" value={activeProfile.simpson} unit="1-D" />
+                    <KPICard
+                      eyebrow="ASVs"
+                      value={activeProfile.asvCount}
+                      meta="exact sequence variants"
+                      meaning="The number of distinct, error-corrected DNA barcode sequences found in this station's water samples."
+                      formula="ASVs = Count of unique amplicon sequence variants"
+                      interpretation="High ASV counts mean high genetic variety in the local micro-plankton and marine organisms at this GPS site."
+                    />
+                    <KPICard
+                      eyebrow="Taxa"
+                      value={activeProfile.taxaCount}
+                      meta="identified groups"
+                      meaning="The number of distinct biological species, genera, or families classified at this hydrographic station."
+                      formula="Taxa = Count of recognized biological taxonomic groups"
+                      interpretation="Shows how many different kinds of marine organisms live together at this station's depth and coordinate."
+                    />
+                    <KPICard
+                      eyebrow="Shannon"
+                      value={activeProfile.shannon}
+                      unit="H'"
+                      meta="entropy index"
+                      meaning="Measures both species variety and how evenly the DNA counts are shared among them."
+                      formula="H' = - Sum [ (Species Share) × ln(Species Share) ]"
+                      interpretation="Scores above 2.0 mean a balanced, healthy community. Scores below 1.0 mean a single species dominates this water layer."
+                    />
+                    <KPICard
+                      eyebrow="Simpson"
+                      value={activeProfile.simpson}
+                      unit="1-D"
+                      meta="dominance weight"
+                      meaning="The likelihood (from 0 to 1) that two random DNA reads from this station belong to completely different species."
+                      formula="1 - D = 1 - Sum [ (Species Share)² ]"
+                      interpretation="Values near 1.0 mean great diversity with no single species crowding out others. Low values mean one dominant organism."
+                    />
                   </div>
 
                   {/* Dominant Taxa */}

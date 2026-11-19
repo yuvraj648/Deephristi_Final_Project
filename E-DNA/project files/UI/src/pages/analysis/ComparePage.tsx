@@ -22,6 +22,111 @@ import {
   Layers,
 } from 'lucide-react';
 
+interface CompareTableHeaderWithTooltipProps {
+  label: string;
+  align?: 'left' | 'right' | 'center';
+  termTitle: string;
+  meaning: string;
+  formula?: string;
+  interpretation?: string;
+}
+
+const CompareTableHeaderWithTooltip: React.FC<CompareTableHeaderWithTooltipProps> = ({
+  label,
+  align = 'left',
+  termTitle,
+  meaning,
+  formula,
+  interpretation,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <th
+      className={`px-3 py-2.5 font-normal text-ink-muted relative group select-none ${
+        align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
+      }`}
+    >
+      <div
+        className={`inline-flex items-center gap-1 cursor-help ${
+          align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start'
+        }`}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="font-mono text-[11px] group-hover:text-sky-300 transition-colors">
+          {label}
+        </span>
+        <span
+          className={`text-[10px] font-mono px-1 py-0.5 rounded transition-colors ${
+            isOpen ? 'text-sky-400 bg-sky-950/60 font-bold' : 'text-ink-faint group-hover:text-sky-400'
+          }`}
+          title="Click to toggle info"
+        >
+          ⓘ
+        </span>
+      </div>
+
+      {/* Floating Tooltip */}
+      <div
+        className={`absolute top-full mb-1 w-72 p-3.5 bg-[#050e18] border border-sky-500/50 text-white rounded-plate shadow-2xl transition-all z-[100] text-left font-sans text-[11px] leading-snug space-y-2 pointer-events-auto ${
+          align === 'right' ? 'right-0' : 'left-0'
+        } ${
+          isOpen
+            ? 'opacity-100 visible'
+            : 'opacity-0 invisible group-hover:opacity-100 group-hover:visible'
+        }`}
+      >
+        <div className="flex items-center justify-between border-b border-rule/60 pb-1.5">
+          <span className="font-mono text-[10px] text-sky-400 font-bold uppercase tracking-wider flex items-center gap-1">
+            <span>ⓘ</span>
+            <span>{termTitle}</span>
+          </span>
+          {isOpen && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+              }}
+              className="text-[11px] text-neutral-400 hover:text-white px-1 rounded hover:bg-white/10"
+              title="Close info panel"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        <div>
+          <span className="text-sky-300 font-bold font-mono text-[9.5px] uppercase tracking-wider block">
+            What It Means:
+          </span>
+          <p className="text-neutral-200 text-[11px] leading-relaxed mt-0.5">{meaning}</p>
+        </div>
+
+        {formula && (
+          <div className="p-2 bg-[#02070e] rounded border border-emerald-500/30">
+            <span className="text-emerald-400 font-mono text-[9.5px] uppercase tracking-wider block font-bold">
+              How It Is Calculated:
+            </span>
+            <code className="text-emerald-200 font-mono text-[10.5px] block pt-0.5 leading-tight">
+              {formula}
+            </code>
+          </div>
+        )}
+
+        {interpretation && (
+          <div>
+            <span className="text-amber-300 font-bold font-mono text-[9.5px] uppercase tracking-wider block">
+              What This Tells You:
+            </span>
+            <p className="text-neutral-300 text-[10.5px] leading-relaxed mt-0.5">{interpretation}</p>
+          </div>
+        )}
+      </div>
+    </th>
+  );
+};
+
 export const ComparePage: React.FC = () => {
   const { siteProfiles, filters, getBetaDiversity } = useAnalysis();
 
@@ -394,12 +499,49 @@ export const ComparePage: React.FC = () => {
               <table className="w-full text-left text-[12px] font-mono">
                 <thead className="bg-paper-sunk border-b border-rule text-ink-muted">
                   <tr>
-                    <th className="px-3 py-2 font-normal">Station Contrast</th>
-                    <th className="px-3 py-2 font-normal text-right">Bray-Curtis (Abundance)</th>
-                    <th className="px-3 py-2 font-normal text-right">Jaccard (Presence/Absence)</th>
-                    <th className="px-3 py-2 font-normal text-right">Shared Taxa Count</th>
-                    <th className="px-3 py-2 font-normal text-right">Unique to Site A</th>
-                    <th className="px-3 py-2 font-normal text-right">Unique to Site B</th>
+                    <CompareTableHeaderWithTooltip
+                      label="Station Contrast"
+                      termTitle="Hydrographic Station Pair"
+                      meaning="The two oceanographic stations being compared side-by-side."
+                      interpretation="Reveals whether species change over geographic distance or across deep vertical water depths."
+                    />
+                    <CompareTableHeaderWithTooltip
+                      label="Bray-Curtis (Abundance)"
+                      align="right"
+                      termTitle="Bray-Curtis Dissimilarity"
+                      meaning="Measures how different the two stations are based on both the presence of species and how many DNA copies each has."
+                      formula="Bray-Curtis = 1 - [ (2 × Shared Reads) ÷ (Reads Site A + Reads Site B) ]"
+                      interpretation="0.0 means identical communities; 1.0 means zero shared species. High scores indicate strong community turnover."
+                    />
+                    <CompareTableHeaderWithTooltip
+                      label="Jaccard (Presence/Absence)"
+                      align="right"
+                      termTitle="Jaccard Distance"
+                      meaning="Measures pure species turnover (replacement) regardless of read counts."
+                      formula="Jaccard = 1 - [ Shared Taxa ÷ (Site A Taxa + Site B Taxa - Shared Taxa) ]"
+                      interpretation="Scores near 1.0 mean almost all species were replaced by different ones between the two sites."
+                    />
+                    <CompareTableHeaderWithTooltip
+                      label="Shared Taxa Count"
+                      align="right"
+                      termTitle="Shared Biological Taxa"
+                      meaning="The count of distinct species or taxonomic groups present at both compared stations."
+                      interpretation="Shows the core community of species that survive across both locations."
+                    />
+                    <CompareTableHeaderWithTooltip
+                      label="Unique to Site A"
+                      align="right"
+                      termTitle="Taxa Restricted to Site A"
+                      meaning="Species detected only at Site A and not present at Site B."
+                      interpretation="Reflects localized organisms adapted specifically to Site A's depth, temperature, or nutrients."
+                    />
+                    <CompareTableHeaderWithTooltip
+                      label="Unique to Site B"
+                      align="right"
+                      termTitle="Taxa Restricted to Site B"
+                      meaning="Species detected only at Site B and not present at Site A."
+                      interpretation="Reflects localized organisms adapted specifically to Site B's conditions."
+                    />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-rule bg-paper-raised">

@@ -1,0 +1,2 @@
+asv_id,sequence,kingdom,phylum,class,order,family,genus,species,confidence,assignment_status,novelty_status,reads
+"ASV_PRED_1795093828300","GCTCCTACCGATTGAGTGATCCGGTGAATAATTCGGACCTCCCCAGGGCCCAGTTACTGTGTGCTGGGGAGGAAAGTTTAGTGAACCTTATCACTTAGAGGAAGGAGAAGTCGTAACAAGGTTTCC","Eukaryota","Chlorophyta","","","","","",76.50,"assigned","potentially_divergent",100

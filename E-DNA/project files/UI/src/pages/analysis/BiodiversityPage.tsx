@@ -271,9 +271,9 @@ export const BiodiversityPage: React.FC = () => {
               }
               unit="ASVs / sample"
               meta="sample mean"
-              meaning="Total number of unique Amplicon Sequence Variants (ASVs) detected within an individual water sample."
-              formula="S = Total distinct ASVs with sequence reads > 0"
-              interpretation="Measures baseline local species richness. Higher values indicate species-rich, biodiverse water columns (e.g. coral reef edges or shelf mixing zones)."
+              meaning="The average number of unique, error-corrected DNA sequence variants (ASVs) detected in a single water sample."
+              formula="Richness (S) = Count of distinct unique DNA barcode sequences detected in each sample"
+              interpretation="Measures baseline local species richness. Higher values indicate a rich, biodiverse water column (e.g. coral reef edges, continental shelves, or nutrient mixing zones)."
             />
             <KPICard
               eyebrow="Mean Shannon Index (H')"
@@ -286,9 +286,9 @@ export const BiodiversityPage: React.FC = () => {
               }
               unit="nats"
               meta="entropy measure"
-              meaning="Information-theoretic entropy index quantifying biological richness and relative abundance uniformity simultaneously."
-              formula="H' = - Σ [ p_i × ln(p_i) ] where p_i is relative taxon abundance"
-              interpretation="Values typically range from 1.5 to 4.5. High Shannon (>3.5) reflects a well-balanced marine ecosystem; low values (<2.0) indicate dominance by bloom species."
+              meaning="Combines both the count of species and how evenly balanced their numbers are in each water sample."
+              formula="H' = - Sum [ (Taxon Population Share) × Natural Log (Taxon Population Share) ]"
+              interpretation="Values typically range from 1.5 to 4.5. High Shannon (>3.0) reflects a resilient, well-balanced marine ecosystem; low values (<1.5) indicate stress or an overwhelming single-species bloom."
             />
             <KPICard
               eyebrow="Mean Simpson (1 - D)"
@@ -300,9 +300,9 @@ export const BiodiversityPage: React.FC = () => {
                   : 'N/A'
               }
               meta="Gini-Simpson index"
-              meaning="Probability that two randomly sampled DNA sequences belong to different biological taxa."
-              formula="1 - D = 1 - Σ (p_i²)"
-              interpretation="Ranges from 0 (monoculture) to 1.0 (infinitely diverse community). Values above 0.85 confirm high ecological diversity and resilience."
+              meaning="The chance (from 0% to 100%) that two random DNA reads from the same water sample belong to two completely different species."
+              formula="1 - D = 1 - Sum [ (Taxon Population Share)² ]"
+              interpretation="Ranges from 0 (monoculture where 1 species owns 100%) to 1.0 (infinitely diverse). Values above 0.80 confirm that no single organism is dominating the habitat."
             />
             <KPICard
               eyebrow="Mean Pielou Evenness (J')"
@@ -315,9 +315,9 @@ export const BiodiversityPage: React.FC = () => {
                   : 'N/A'
               }
               meta="evenness ratio"
-              meaning="Equitability index comparing actual observed Shannon entropy to the maximum possible entropy if all species were equally abundant."
-              formula="J' = H' ÷ ln(S)"
-              interpretation="Ranges from 0 to 1.0. A high ratio (>0.6) indicates reads are evenly spread across taxa without single-species monopolization."
+              meaning="Measures population equality: how close the community is to having an exactly equal number of individuals for every species."
+              formula="J' = Observed Shannon Index (H') ÷ Theoretical Maximum Shannon ln(S)"
+              interpretation="Ranges from 0 to 1.0. High ratios (>0.6) show that organisms coexist fairly evenly without one aggressive species choking out the rest."
             />
           </div>
 
@@ -356,41 +356,41 @@ export const BiodiversityPage: React.FC = () => {
                       label="Observed Richness"
                       align="right"
                       termTitle="Observed ASV Richness (S)"
-                      meaning="Total unique amplicon sequence variants detected in this specific specimen."
-                      formula="S = Count of distinct ASVs"
-                      interpretation="Direct count of taxonomic lineages present in the sampled water."
+                      meaning="The total number of distinct, error-corrected DNA sequence barcodes recovered from this individual water sample."
+                      formula="Richness (S) = Count of distinct unique ASVs"
+                      interpretation="Direct measure of local genetic variety. Higher values mean more unique organisms were swimming in this specific water parcel."
                     />
                     <TableHeaderWithTooltip
                       label="Shannon (H')"
                       align="right"
-                      termTitle="Shannon Entropy Index (H')"
-                      meaning="Entropy measure combining species count and relative abundance uniformity."
-                      formula="H' = - Σ [ p_i × ln(p_i) ]"
-                      interpretation="High values (>3.5) represent diverse, mature marine communities."
+                      termTitle="Shannon Diversity Index (H')"
+                      meaning="Measures both species variety and how evenly DNA reads are shared across those species."
+                      formula="H' = - Sum [ (Species Share) × ln(Species Share) ]"
+                      interpretation="High scores (>3.0) represent healthy, stable ocean communities. Low scores (<1.5) indicate environmental stress or a single species dominating."
                     />
                     <TableHeaderWithTooltip
                       label="Simpson (1 - D)"
                       align="right"
                       termTitle="Gini-Simpson Diversity (1 - D)"
-                      meaning="Probability that two randomly picked sequences represent different taxa."
-                      formula="1 - D = 1 - Σ (p_i²)"
-                      interpretation="接近 1.0 indicates community is not dominated by any single taxon."
+                      meaning="The probability (0% to 100%) that two random DNA reads from this sample belong to completely different species."
+                      formula="1 - D = 1 - Sum [ (Species Share)² ]"
+                      interpretation="Values close to 1.0 indicate a balanced community where no single species dominates. Low values mean one organism monopolizes the water."
                     />
                     <TableHeaderWithTooltip
                       label="Evenness (J')"
                       align="right"
-                      termTitle="Pielou's Evenness (J')"
-                      meaning="Ratio of observed Shannon diversity to maximal theoretical diversity."
-                      formula="J' = H' ÷ ln(S)"
-                      interpretation="Values near 1.0 denote balanced species populations without bloom dominance."
+                      termTitle="Pielou's Evenness Index (J')"
+                      meaning="Evaluates how equally distributed the species populations are, compared to an ideal world where every species has identical numbers."
+                      formula="J' = Observed Shannon Index (H') ÷ ln(Observed Richness)"
+                      interpretation="Values near 1.0 denote balanced populations with no dominant species. Values near 0 indicate extreme imbalance."
                     />
                     <TableHeaderWithTooltip
                       label="Total Reads"
                       align="right"
                       termTitle="Total Sequenced Reads"
-                      meaning="Sum of high-quality amplicon reads mapped to classified ASVs in this sample."
-                      formula="Total Reads = Σ Abundance of all ASVs"
-                      interpretation="Provides sequencing depth verification for reliable abundance estimation."
+                      meaning="The total count of DNA sequencing reads successfully mapped to classified organisms in this sample."
+                      formula="Total Reads = Sum of abundance reads for all ASVs"
+                      interpretation="Verifies sequencing depth and proves there was enough biological data to make reliable diversity estimates."
                     />
                   </tr>
                 </thead>
@@ -437,35 +437,35 @@ export const BiodiversityPage: React.FC = () => {
               eyebrow="Mean Bray-Curtis"
               value={betaStats.meanBray.toFixed(2)}
               meta="abundance dissimilarity"
-              meaning="Average compositional dissimilarity across all hydrographic station pairs, weighted by relative taxa abundance."
-              formula="BC = 1 - [ (2 × Σ min(x_Ai, x_Bi)) ÷ (Total_A + Total_B) ]"
-              interpretation="0.0 = identical communities; 1.0 = completely disjoint communities. High values (>0.70) reveal pronounced community turnover across stations."
+              meaning="Measures how different stations are in both which species they have and how numerous they are. Scaled from 0.0 (identical twins) to 1.0 (zero shared species)."
+              formula="Bray-Curtis = 1 - [ (2 × Shared Abundance) ÷ (Total Abundance Site A + Total Abundance Site B) ]"
+              interpretation="Values above 0.70 show high turnover, meaning marine life changes dramatically between stations (e.g. from sunlit coastal waters to deep ocean trenches)."
             />
             <KPICard
               eyebrow="Mean Jaccard Distance"
               value={betaStats.meanJaccard.toFixed(2)}
               meta="presence/absence turnover"
-              meaning="Average taxonomic turnover rate based solely on whether species are present or absent, ignoring sequence read counts."
-              formula="Jaccard = 1 - [ Shared ÷ (Site A + Site B - Shared) ]"
-              interpretation="Measures true species replacement across depth and geographic distance regardless of read depth."
+              meaning="Measures pure species replacement between stations based strictly on presence or absence (ignoring whether a species has 10 reads or 10,000 reads)."
+              formula="Jaccard = 1 - [ Shared Species Count ÷ Total Unique Species Across Both Sites ]"
+              interpretation="Values close to 1.0 indicate that almost all species at one station are swapped out for completely different species at the other station."
             />
             <KPICard
               eyebrow="Highest Turnover Pair"
               value={betaStats.maxBrayVal.toFixed(2)}
               unit="BC"
               meta={betaStats.maxTurnoverPair}
-              meaning="The pair of oceanographic stations exhibiting the greatest biological divergence in community composition."
-              formula="Max [ BC(Site_i, Site_j) ] across all pairs"
-              interpretation="Identifies key environmental transition boundaries (e.g. shallow shelf waters vs bathypelagic deep trench)."
+              meaning="The two stations that differ the most from each other in biological species and DNA counts."
+              formula="Max [ Bray-Curtis Distance ] across all tested station pairs"
+              interpretation="Pinpoints the most extreme environmental contrast in the expedition (e.g. comparing shallow epipelagic surface water against deep 1,600m bathypelagic water)."
             />
             <KPICard
               eyebrow="Avg Shared Taxa"
               value={betaStats.avgSharedTaxa}
               unit="taxa"
               meta="core community overlap"
-              meaning="Average number of biological taxa that persist and occur simultaneously across sampled station pairs."
-              formula="Mean [ Shared Taxa Count between Site A and Site B ]"
-              interpretation="Represents ubiquitous ecological generalists that maintain marine ecosystem stability."
+              meaning="The average number of species that are sturdy enough or widespread enough to live at both compared stations."
+              formula="Average [ Count of common taxa present at both Station A and Station B ]"
+              interpretation="Represents ubiquitous ecological generalists and cosmopolitan species that maintain basic ecosystem functions across the ocean basin."
             />
           </div>
 
@@ -482,45 +482,45 @@ export const BiodiversityPage: React.FC = () => {
                     <TableHeaderWithTooltip
                       label="Station Pair"
                       termTitle="Hydrographic Station Pair"
-                      meaning="Two oceanographic sampling stations compared for community composition and species turnover."
-                      interpretation="Reveals biological divergence across depth or geographic distance."
+                      meaning="Two oceanographic sampling stations compared side-by-side to see how much species composition changes."
+                      interpretation="Reveals whether species change over geographic distance or across deep vertical water depths."
                     />
                     <TableHeaderWithTooltip
                       label="Bray-Curtis Dissimilarity"
                       align="right"
                       termTitle="Bray-Curtis Dissimilarity (BC)"
-                      meaning="Abundance-weighted distance metric quantifying how dissimilar two stations are in species counts."
-                      formula="BC_ij = 1 - [ (2 × C_ij) ÷ (S_i + S_j) ]"
-                      interpretation="0 = identical species abundance; 1 = zero shared species between stations."
+                      meaning="Measures how different two stations are based on both which species are present and how many DNA reads each has."
+                      formula="Bray-Curtis = 1 - [ (2 × Shared Abundance) ÷ (Total Reads Site A + Total Reads Site B) ]"
+                      interpretation="0 = identical species and counts; 1.0 = zero shared species between stations."
                     />
                     <TableHeaderWithTooltip
                       label="Jaccard Distance"
                       align="right"
                       termTitle="Jaccard Distance (J)"
-                      meaning="Turnover metric evaluating species replacement based strictly on presence/absence."
-                      formula="Jaccard = 1 - [ Shared ÷ (Site A + Site B - Shared) ]"
-                      interpretation="Pure species turnover independent of sequencing read depth."
+                      meaning="Evaluates species replacement based purely on presence vs absence (ignoring whether read counts are high or low)."
+                      formula="Jaccard = 1 - [ Shared Taxa ÷ (Site A Taxa + Site B Taxa - Shared Taxa) ]"
+                      interpretation="Pure species turnover. High values close to 1.0 show that completely different species inhabit the two stations."
                     />
                     <TableHeaderWithTooltip
                       label="Shared Taxa"
                       align="right"
                       termTitle="Shared Taxa Count"
-                      meaning="Number of distinct biological taxa present at both sampling stations."
-                      interpretation="Measures the common core assemblage connecting the two sites."
+                      meaning="The number of identical biological species or groups detected at both sampling stations."
+                      interpretation="Measures the common core community that survives across both ocean locations."
                     />
                     <TableHeaderWithTooltip
                       label="Unique to Site A"
                       align="right"
                       termTitle="Taxa Restricted to Site A"
-                      meaning="Number of biological taxa detected strictly at Station A and absent from Station B."
-                      interpretation="Reflects local habitat specialists or localized environmental adaptations."
+                      meaning="The count of species that live only at Station A and were never detected at Station B."
+                      interpretation="Highlights localized habitat specialists adapted to Station A's specific temperature, depth, or nutrients."
                     />
                     <TableHeaderWithTooltip
                       label="Unique to Site B"
                       align="right"
                       termTitle="Taxa Restricted to Site B"
-                      meaning="Number of biological taxa detected strictly at Station B and absent from Station A."
-                      interpretation="Reflects species replacement on the opposite side of the environmental gradient."
+                      meaning="The count of species that live only at Station B and were never detected at Station A."
+                      interpretation="Highlights species adapted specifically to Station B's unique water conditions."
                     />
                   </tr>
                 </thead>
@@ -565,35 +565,35 @@ export const BiodiversityPage: React.FC = () => {
               value={gamma.totalObservedRichness}
               unit="ASVs"
               meta="gamma pool richness"
-              meaning="Total unique Amplicon Sequence Variants cataloged across the entire regional expedition transect."
-              formula="γ = Total unique ASVs in pooled dataset"
+              meaning="The total number of distinct DNA sequence variants discovered across all sampling stations pooled together into one grand catalogue."
+              formula="Regional Richness (γ) = Count of all distinct ASVs found across the entire expedition"
               interpretation="Represents the macro-scale genetic reservoir of the surveyed ocean basin."
             />
             <KPICard
               eyebrow="Total Distinct Taxa"
               value={gamma.totalTaxaCount}
               meta={`at ${filters.taxonomicRank} rank`}
-              meaning="Total unique Linnaean biological taxa classified at the active taxonomic rank across all stations."
-              formula="Count of unique classified taxonomic names"
-              interpretation="Quantifies high-level phylogenetic richness across the ocean region."
+              meaning="The total count of distinct biological groups (species, genera, or families) classified in the entire regional dataset."
+              formula="Total Taxa = Count of unique identified scientific taxonomic names"
+              interpretation="Provides the overall species count and biological variety across the surveyed ocean territory."
             />
             <KPICard
               eyebrow="Regional Pooled Shannon"
               value={gamma.regionalShannon}
               unit="H'"
               meta="across all stations"
-              meaning="Regional-scale Shannon diversity index computed by pooling all reads across all stations simultaneously."
-              formula="H'_gamma = - Σ [ P_global × ln(P_global) ]"
-              interpretation="Reflects the overall biodiversity capacity and ecosystem maturity of the broad marine basin."
+              meaning="Regional-scale Shannon diversity computed by merging all water samples across all stations into one master community."
+              formula="H'_regional = - Sum [ (Global Taxon Share) × ln(Global Taxon Share) ]"
+              interpretation="Reflects the overall biodiversity capacity and ecosystem maturity of the broad ocean basin."
             />
             <KPICard
               eyebrow="Whittaker Turnover Ratio"
               value={whittakerBeta}
               unit="β"
               meta="regional expansion factor"
-              meaning="Whittaker's multiplicative beta diversity ratio comparing regional richness to local average sample richness."
-              formula="β_Whittaker = Gamma Richness (γ) ÷ Mean Alpha Richness (ᾱ)"
-              interpretation="Values significantly greater than 1.0 indicate strong spatial and depth-wise species turnover across the ocean."
+              meaning="Shows how many times richer the entire ocean region is compared to an individual sampling site. It reveals how much diversity expands because different species live at different stations or depths."
+              formula="Whittaker Beta (β) = Total Regional Richness (γ) ÷ Average Station Richness (ᾱ)"
+              interpretation="Values significantly greater than 1.0 (e.g. 3.0× - 5.0×) prove strong depth and spatial variation: no single drop of water holds all the species, so you must explore multiple sites to see the full ecosystem."
             />
           </div>
 
@@ -673,7 +673,7 @@ export const BiodiversityPage: React.FC = () => {
               {/* 3 Pillar Cards (Alpha, Beta, Gamma) */}
               <div className="space-y-4">
                 {/* Alpha Card */}
-                <div className="p-4 bg-paper-sunk rounded border border-rule space-y-2">
+                <div className="p-4 bg-paper-sunk rounded border border-rule space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 rounded bg-sky-900/50 text-sky-300 font-mono text-[10px] font-bold border border-sky-700">
@@ -686,22 +686,32 @@ export const BiodiversityPage: React.FC = () => {
                     <span className="text-[11px] font-mono text-emerald-400 font-semibold">Local Site Level</span>
                   </div>
                   <p className="text-xs text-neutral-300 leading-relaxed">
-                    <strong>What it means:</strong> Measures the biological richness and community balance at one specific sampling location or water sample.
+                    <strong className="text-sky-300 font-mono text-[11px]">What It Means:</strong> Measures how rich and balanced the living community is in a single drop of water or at one specific sampling station.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] font-mono pt-1">
-                    <div className="p-2 bg-[#050f1e] rounded border border-rule/60">
+                    <div className="p-2.5 bg-[#050f1e] rounded border border-sky-500/30 space-y-1">
                       <span className="text-sky-300 font-bold block">Shannon Index (H')</span>
-                      <span className="text-neutral-300 font-sans text-[10px]">Quantifies biological entropy. Higher values mean higher richness and abundance balance.</span>
+                      <span className="text-neutral-300 font-sans text-[11px] block leading-snug">
+                        <strong>Formula:</strong> H' = - Sum [ (Species Share) × ln(Species Share) ]
+                      </span>
+                      <span className="text-neutral-400 font-sans text-[10.5px] block leading-snug">
+                        Combines species variety and population balance. Scores above 2.5 mean a healthy, coexisting habitat.
+                      </span>
                     </div>
-                    <div className="p-2 bg-[#050f1e] rounded border border-rule/60">
-                      <span className="text-sky-300 font-bold block">Simpson (1 - D)</span>
-                      <span className="text-neutral-300 font-sans text-[10px]">Probability two random DNA reads differ. Measures resistance to single-species dominance.</span>
+                    <div className="p-2.5 bg-[#050f1e] rounded border border-sky-500/30 space-y-1">
+                      <span className="text-sky-300 font-bold block">Simpson Index (1 - D)</span>
+                      <span className="text-neutral-300 font-sans text-[11px] block leading-snug">
+                        <strong>Formula:</strong> 1 - D = 1 - Sum [ (Species Share)² ]
+                      </span>
+                      <span className="text-neutral-400 font-sans text-[10.5px] block leading-snug">
+                        The probability that two random DNA reads belong to different species. Higher (close to 1.0) means no single species dominates.
+                      </span>
                     </div>
                   </div>
                 </div>
 
                 {/* Beta Card */}
-                <div className="p-4 bg-paper-sunk rounded border border-rule space-y-2">
+                <div className="p-4 bg-paper-sunk rounded border border-rule space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 rounded bg-emerald-900/50 text-emerald-300 font-mono text-[10px] font-bold border border-emerald-700">
@@ -714,22 +724,32 @@ export const BiodiversityPage: React.FC = () => {
                     <span className="text-[11px] font-mono text-emerald-400 font-semibold">Spatial & Depth Gradient</span>
                   </div>
                   <p className="text-xs text-neutral-300 leading-relaxed">
-                    <strong>What it means:</strong> Measures how much the species composition changes when you travel from one station to another, or from shallow waters into the deep bathypelagic abyss.
+                    <strong className="text-emerald-300 font-mono text-[11px]">What It Means:</strong> Measures how much species change as you travel between different stations, or as you dive from sunlit surface waters into the deep, dark abyss.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] font-mono pt-1">
-                    <div className="p-2 bg-[#050f1e] rounded border border-rule/60">
+                    <div className="p-2.5 bg-[#050f1e] rounded border border-emerald-500/30 space-y-1">
                       <span className="text-emerald-300 font-bold block">Bray-Curtis Dissimilarity</span>
-                      <span className="text-neutral-300 font-sans text-[10px]">Abundance-weighted distance (0 = identical; 1 = completely different species).</span>
+                      <span className="text-neutral-300 font-sans text-[11px] block leading-snug">
+                        <strong>Formula:</strong> 1 - [ (2 × Shared Abundance) ÷ (Total A + Total B) ]
+                      </span>
+                      <span className="text-neutral-400 font-sans text-[10.5px] block leading-snug">
+                        Abundance-weighted distance (0 = identical communities; 1 = zero shared species).
+                      </span>
                     </div>
-                    <div className="p-2 bg-[#050f1e] rounded border border-rule/60">
-                      <span className="text-emerald-300 font-bold block">Jaccard Distance</span>
-                      <span className="text-neutral-300 font-sans text-[10px]">Presence/absence turnover evaluating pure species replacement.</span>
+                    <div className="p-2.5 bg-[#050f1e] rounded border border-emerald-500/30 space-y-1">
+                      <span className="text-emerald-300 font-bold block">Jaccard Turnover Distance</span>
+                      <span className="text-neutral-300 font-sans text-[11px] block leading-snug">
+                        <strong>Formula:</strong> 1 - [ Shared Taxa ÷ Total Taxa in Both Sites ]
+                      </span>
+                      <span className="text-neutral-400 font-sans text-[10.5px] block leading-snug">
+                        Pure presence/absence turnover checking whether species are replaced completely regardless of count.
+                      </span>
                     </div>
                   </div>
                 </div>
 
                 {/* Gamma Card */}
-                <div className="p-4 bg-paper-sunk rounded border border-rule space-y-2">
+                <div className="p-4 bg-paper-sunk rounded border border-rule space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 rounded bg-purple-900/50 text-purple-300 font-mono text-[10px] font-bold border border-purple-700">
@@ -742,12 +762,15 @@ export const BiodiversityPage: React.FC = () => {
                     <span className="text-[11px] font-mono text-purple-400 font-semibold">Broad Regional Biome</span>
                   </div>
                   <p className="text-xs text-neutral-300 leading-relaxed">
-                    <strong>What it means:</strong> Represents the total cumulative biodiversity cataloged across all sampled locations in the entire Arabian Sea study region.
+                    <strong className="text-purple-300 font-mono text-[11px]">What It Means:</strong> The grand total library of all biological species cataloged across the entire survey region combined.
                   </p>
-                  <div className="p-2 bg-[#050f1e] rounded border border-rule/60 text-[11px] font-mono">
-                    <span className="text-purple-300 font-bold block">Whittaker Ratio (β = γ / ᾱ)</span>
-                    <span className="text-neutral-300 font-sans text-[10px]">
-                      Current expedition ratio: <strong>{whittakerBeta}×</strong>. Indicates regional richness is {whittakerBeta} times higher than average local samples due to strong environmental depth partitioning.
+                  <div className="p-2.5 bg-[#050f1e] rounded border border-purple-500/30 space-y-1 text-[11px] font-mono">
+                    <span className="text-purple-300 font-bold block">Whittaker Ratio (β = γ ÷ ᾱ)</span>
+                    <span className="text-neutral-300 font-sans text-[11px] block leading-snug">
+                      <strong>Formula:</strong> Total Regional Richness (γ) ÷ Average Sample Richness (ᾱ)
+                    </span>
+                    <span className="text-neutral-300 font-sans text-[10.5px] block leading-snug">
+                      Current expedition ratio: <strong className="text-purple-300">{whittakerBeta}×</strong>. This proves regional richness is {whittakerBeta} times higher than any single local sample, showing that deep ocean depths create specialized biological communities.
                     </span>
                   </div>
                 </div>

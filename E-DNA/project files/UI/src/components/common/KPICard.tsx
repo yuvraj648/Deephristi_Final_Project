@@ -48,49 +48,49 @@ export const KPICard: React.FC<KPICardProps> = ({
       {/* Floating Hover & Click Tooltip */}
       {hasTooltip && (
         <div
-          className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3 bg-[#050e18] border border-sky-500/40 text-white rounded-plate shadow-2xl transition-all z-50 text-left font-sans text-[11px] leading-snug space-y-1.5 ${
+          className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-80 p-3.5 bg-[#050e18] border border-sky-500/50 text-white rounded-plate shadow-2xl transition-all z-[100] text-left font-sans text-[11px] leading-snug space-y-2 pointer-events-auto ${
             isTooltipOpen
-              ? 'opacity-100 pointer-events-auto'
-              : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto'
+              ? 'opacity-100 visible'
+              : 'opacity-0 invisible group-hover:opacity-100 group-hover:visible'
           }`}
         >
-          <div className="flex items-center justify-between border-b border-rule/60 pb-1">
-            <span className="font-mono text-[10px] text-sky-400 font-bold uppercase tracking-wider">
-              {eyebrow}
+          <div className="flex items-center justify-between border-b border-rule/60 pb-1.5">
+            <span className="font-mono text-[10.5px] text-sky-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+              <span className="text-[12px]">ⓘ</span>
+              <span>{eyebrow}</span>
             </span>
-            {isTooltipOpen && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsTooltipOpen(false);
-                }}
-                className="text-[10px] text-neutral-400 hover:text-white"
-              >
-                ✕
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsTooltipOpen(false);
+              }}
+              className="text-[11px] text-neutral-400 hover:text-white px-1 rounded hover:bg-white/10 transition-colors"
+              title="Close info panel"
+            >
+              ✕
+            </button>
           </div>
 
           {description && !meaning && (
-            <p className="text-neutral-200 leading-relaxed">{description}</p>
+            <p className="text-neutral-200 leading-relaxed text-[11.5px]">{description}</p>
           )}
 
           {meaning && (
             <div>
-              <span className="text-sky-300 font-semibold font-mono text-[9px] uppercase tracking-wider block">
-                Meaning:
+              <span className="text-sky-300 font-bold font-mono text-[9.5px] uppercase tracking-wider block">
+                What It Means:
               </span>
-              <p className="text-neutral-200 text-[11px] leading-relaxed">{meaning}</p>
+              <p className="text-neutral-200 text-[11px] leading-relaxed mt-0.5">{meaning}</p>
             </div>
           )}
 
           {formula && (
-            <div className="p-1.5 bg-[#02070e] rounded border border-emerald-500/30">
-              <span className="text-emerald-400 font-mono text-[9px] uppercase tracking-wider block font-semibold">
-                Formula / Computation:
+            <div className="p-2 bg-[#02070e] rounded border border-emerald-500/30">
+              <span className="text-emerald-400 font-mono text-[9.5px] uppercase tracking-wider block font-bold">
+                How It Is Calculated / Formula:
               </span>
-              <code className="text-emerald-200 font-mono text-[10px] block pt-0.5 leading-tight">
+              <code className="text-emerald-200 font-mono text-[10.5px] block pt-0.5 leading-snug">
                 {formula}
               </code>
             </div>
@@ -98,10 +98,10 @@ export const KPICard: React.FC<KPICardProps> = ({
 
           {interpretation && (
             <div>
-              <span className="text-amber-300 font-semibold font-mono text-[9px] uppercase tracking-wider block">
-                Ecological Interpretation:
+              <span className="text-amber-300 font-bold font-mono text-[9.5px] uppercase tracking-wider block">
+                What This Tells You:
               </span>
-              <p className="text-neutral-300 text-[10px] leading-relaxed">{interpretation}</p>
+              <p className="text-neutral-300 text-[10.5px] leading-relaxed mt-0.5">{interpretation}</p>
             </div>
           )}
 
