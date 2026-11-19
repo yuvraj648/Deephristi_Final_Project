@@ -105,6 +105,12 @@ def predict_sequence(request: PredictRequest):
 
     try:
         result = manager.predict(sequence, request.model_id)
+        # Attach authoritative 7-level Linnaean hierarchy
+        resolved = manager.resolve_taxonomy(sequence, request.model_id)
+        result["taxonomy"] = resolved.get("taxonomy")
+        if resolved.get("source") == "reference_catalog":
+            result["confidence"] = max(result.get("confidence", 0.0), resolved["confidence"])
+            result["potentially_unusual"] = False
         return result
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))

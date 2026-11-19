@@ -1,19 +1,25 @@
-# 1. Stage all your changed / new files
-git add .
-
-# 2. Commit with a message describing what you changed
-git commit -m "feat: description of your changes here"
-
-# 3. Push to your branch on GitHub
-git push origin yuvraj
-
-git checkout yuvraj
-git checkout main
-git pull origin main 
-
-
-current changes
+process 1
+# 1. Ensure you are on the latest main branch
 git checkout main
 git pull origin main
-git merge yuvraj
+
+# 2. Create and switch to your new branch (choose any name you like)
+git checkout -b yuvrajv2
+
+process 2
+# 1. Stage all your changed files
+git add .
+# 2. Commit with a message describing what you did
+git commit -m "feat: your feature description here"
+# 3. Push to GitHub under your new branch
+git push origin yuvrajv2
+
+process 3
+# 1. Switch back to main
+git checkout main
+# 2. Pull the latest from GitHub (in case any teammate pushed)
+git pull origin main
+# 3. Merge your new branch into main
+git merge yuvrajv2
+# 4. Push the updated main to GitHub
 git push origin main
