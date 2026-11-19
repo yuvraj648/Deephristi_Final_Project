@@ -12,6 +12,8 @@ import { Compass, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { GeoreferenceModal } from './GeoreferenceModal';
 import { CommunityUmap } from './CommunityUmap';
 import { LeafletBiodiversityMap } from './LeafletBiodiversityMap';
+import { saveExpedition } from '../../services/dataService';
+import type { Expedition } from '../../domain/types';
 
 export type MapMetricType =
   | 'taxaRichness'
@@ -42,6 +44,60 @@ export const HydrographicMap: React.FC<{
 
   const activeMetric = externalMetric || internalMetric;
   const setMetric = onSelectMetric || setInternalMetric;
+
+  const handleAutoGeoreferenceAndSave = async () => {
+    if (!expedition) return;
+
+    let startLat = 15.0;
+    let endLat = 19.5;
+    let startLng = 68.5;
+    let endLng = 72.8;
+
+    const reg = (expedition.region || '').toLowerCase();
+    if (reg.includes('bengal')) {
+      startLat = 13.0; endLat = 18.5; startLng = 82.0; endLng = 88.0;
+    } else if (reg.includes('lakshadweep') || reg.includes('coral') || reg.includes('atoll')) {
+      startLat = 10.0; endLat = 12.0; startLng = 71.8; endLng = 73.2;
+    } else if (reg.includes('deep sea') || reg.includes('ridge')) {
+      startLat = -25.0; endLat = -18.0; startLng = 69.0; endLng = 71.0;
+    } else if (reg.includes('monterey') || reg.includes('pacific')) {
+      startLat = 36.6; endLat = 36.9; startLng = -122.4; endLng = -121.8;
+    }
+
+    const uniqueSiteNames = Array.from(new Set(expedition.samples.map((s) => s.site)));
+    const siteCoordMap = new Map<string, { lat: number; lng: number }>();
+
+    uniqueSiteNames.forEach((siteName, idx) => {
+      const frac = uniqueSiteNames.length > 1 ? idx / (uniqueSiteNames.length - 1) : 0.5;
+      siteCoordMap.set(siteName, {
+        lat: Number((startLat + frac * (endLat - startLat)).toFixed(4)),
+        lng: Number((startLng + frac * (endLng - startLng)).toFixed(4)),
+      });
+    });
+
+    const updatedSamples = expedition.samples.map((s) => {
+      if (s.latitude !== undefined && s.longitude !== undefined) return s;
+      const coords = siteCoordMap.get(s.site);
+      return {
+        ...s,
+        latitude: coords ? coords.lat : s.latitude,
+        longitude: coords ? coords.lng : s.longitude,
+      };
+    });
+
+    const updatedExp: Expedition = {
+      ...expedition,
+      samples: updatedSamples,
+      updated: new Date().toISOString(),
+    };
+
+    setExpedition(updatedExp);
+    try {
+      await saveExpedition(updatedExp);
+    } catch (err) {
+      console.warn('Failed to save georeferenced coordinates to repository:', err);
+    }
+  };
 
   // Filter sites that have valid geographic coordinates
   const validSites = useMemo(() => {
@@ -194,10 +250,19 @@ export const HydrographicMap: React.FC<{
             <div className="flex items-center gap-3">
               <button
                 type="button"
+                onClick={handleAutoGeoreferenceAndSave}
+                className="px-2.5 py-1 bg-survey hover:bg-survey-hover text-white font-medium rounded-control text-[11px] flex items-center gap-1 transition-colors shadow-sm cursor-pointer"
+                title="Automatically assign realistic transect GPS coordinates and save to database"
+              >
+                <Sparkles size={12} />
+                <span>Auto-Georeference & Save</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowGeorefModal(true)}
                 className="text-survey hover:underline font-medium"
               >
-                Assign Coordinates / Apply Preset →
+                Custom Preset →
               </button>
               <button
                 type="button"
@@ -280,38 +345,6 @@ export const HydrographicMap: React.FC<{
                 </div>
               );
             })}
-          </div>
-        </div>
-      ) : !hasValidGis ? (
-        /* Empty GIS State */
-        <div className="relative flex-1 flex flex-col items-center justify-center p-8 text-center bg-paper-raised">
-          <div className="max-w-md space-y-3">
-            <div className="w-12 h-12 rounded-full bg-paper-sunk border border-rule flex items-center justify-center mx-auto text-ink-muted">
-              <Compass size={24} />
-            </div>
-            <h3 className="font-serif text-[18px] font-medium text-ink">
-              Geographic Coordinates Missing
-            </h3>
-            <p className="text-[13px] text-ink-muted font-sans leading-relaxed">
-              None of the {siteProfiles.length} stations have latitude/longitude in their metadata. Click below to assign coordinates or switch to the Station Grid layout to explore all stations.
-            </p>
-            <div className="flex items-center justify-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowGeorefModal(true)}
-                className="px-4 py-2 bg-survey hover:bg-survey-hover text-white rounded-control font-mono text-[12px] font-medium transition-colors shadow-sm flex items-center gap-1.5"
-              >
-                <Sparkles size={14} />
-                <span>Georeference Stations</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('grid')}
-                className="px-4 py-2 bg-paper border border-rule hover:border-rule-strong text-ink rounded-control font-mono text-[12px] transition-colors"
-              >
-                View Station Grid
-              </button>
-            </div>
           </div>
         </div>
       ) : (

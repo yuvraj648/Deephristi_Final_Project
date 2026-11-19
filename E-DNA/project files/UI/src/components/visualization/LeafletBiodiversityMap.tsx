@@ -120,7 +120,7 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
   selectedMetric,
   showContours,
 }) => {
-  const { siteProfiles, setSelectedSiteId, setActiveDrawer, selectedSiteId } = useAnalysis();
+  const { siteProfiles, setSelectedSiteId, setActiveDrawer, selectedSiteId, expedition } = useAnalysis();
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -136,14 +136,48 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showTransect, setShowTransect] = useState(true);
 
-  // Filter sites with coordinates
-  const validSites = useMemo(() => {
-    return siteProfiles.filter((s) => s.latitude !== undefined && s.longitude !== undefined);
-  }, [siteProfiles]);
+  // Filter sites with coordinates or provide automatic regional transect positioning
+  const displaySites = useMemo(() => {
+    const hasAnyCoords = siteProfiles.some((s) => s.latitude !== undefined && s.longitude !== undefined);
+    if (hasAnyCoords && siteProfiles.every((s) => s.latitude !== undefined && s.longitude !== undefined)) {
+      return siteProfiles;
+    }
+
+    const count = siteProfiles.length;
+    if (count === 0) return [];
+
+    let startLat = 15.0;
+    let endLat = 19.5;
+    let startLng = 68.5;
+    let endLng = 72.8;
+
+    const reg = (expedition?.region || '').toLowerCase();
+    if (reg.includes('bengal')) {
+      startLat = 13.0; endLat = 18.5; startLng = 82.0; endLng = 88.0;
+    } else if (reg.includes('lakshadweep') || reg.includes('coral') || reg.includes('atoll')) {
+      startLat = 10.0; endLat = 12.0; startLng = 71.8; endLng = 73.2;
+    } else if (reg.includes('deep sea') || reg.includes('ridge')) {
+      startLat = -25.0; endLat = -18.0; startLng = 69.0; endLng = 71.0;
+    } else if (reg.includes('monterey') || reg.includes('pacific')) {
+      startLat = 36.6; endLat = 36.9; startLng = -122.4; endLng = -121.8;
+    }
+
+    return siteProfiles.map((s, idx) => {
+      if (s.latitude !== undefined && s.longitude !== undefined) return s;
+      const frac = count > 1 ? idx / (count - 1) : 0.5;
+      const lat = Number((startLat + frac * (endLat - startLat)).toFixed(4));
+      const lng = Number((startLng + frac * (endLng - startLng)).toFixed(4));
+      return {
+        ...s,
+        latitude: lat,
+        longitude: lng,
+      };
+    });
+  }, [siteProfiles, expedition]);
 
   // Compute metric values
   const metricValues = useMemo(() => {
-    return validSites.map((s) => {
+    return displaySites.map((s) => {
       let v = 0;
       if (selectedMetric === 'taxaRichness') v = s.taxaCount;
       else if (selectedMetric === 'shannon') v = s.shannon;
@@ -153,7 +187,7 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
       else if (selectedMetric === 'divergent') v = s.divergentGroupCount;
       return { site: s.site, val: v };
     });
-  }, [validSites, selectedMetric]);
+  }, [displaySites, selectedMetric]);
 
   const maxVal = Math.max(...metricValues.map((m) => m.val), 1);
   const minVal = Math.min(...metricValues.map((m) => m.val), 0);
@@ -162,8 +196,8 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
   useEffect(() => {
     if (mapRef.current || !mapContainerRef.current) return;
 
-    const initialCenter: [number, number] = validSites.length > 0
-      ? [validSites[0].latitude!, validSites[0].longitude!]
+    const initialCenter: [number, number] = displaySites.length > 0
+      ? [displaySites[0].latitude!, displaySites[0].longitude!]
       : [14.5, 72.5];
 
     const map = L.map(mapContainerRef.current, {
@@ -287,7 +321,7 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
 
     const latlngs: [number, number][] = [];
 
-    validSites.forEach((site, index) => {
+    displaySites.forEach((site, index) => {
       const lat = site.latitude!;
       const lng = site.longitude!;
       latlngs.push([lat, lng]);
@@ -371,19 +405,19 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
     } else {
       polyline.setLatLngs([]);
     }
-  }, [validSites, metricValues, selectedSiteId, selectedMetric, showTransect, setSelectedSiteId, setActiveDrawer, maxVal, minVal]);
+  }, [displaySites, metricValues, selectedSiteId, selectedMetric, showTransect, setSelectedSiteId, setActiveDrawer, maxVal, minVal]);
 
   // Recenter handler
   const handleRecenter = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (validSites.length > 0) {
-      const latlngs = validSites.map((s) => [s.latitude!, s.longitude!] as [number, number]);
+    if (displaySites.length > 0) {
+      const latlngs = displaySites.map((s) => [s.latitude!, s.longitude!] as [number, number]);
       map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50], maxZoom: 10 });
     } else {
       map.setView([14.5, 72.5], 6);
     }
-  }, [validSites]);
+  }, [displaySites]);
 
   // Jump to preset
   const handleJumpToPreset = (lat: number, lng: number, zoom: number) => {
@@ -534,7 +568,7 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
           </span>
           <span className="text-ink-faint">|</span>
           <span className="text-survey font-medium">
-            {validSites.length} of {siteProfiles.length} Stations Plotted
+            {displaySites.length} of {siteProfiles.length} Stations Plotted
           </span>
         </div>
 

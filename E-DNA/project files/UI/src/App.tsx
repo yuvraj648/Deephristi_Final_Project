@@ -33,7 +33,7 @@ import { AsvDetailDrawer } from './components/drawers/AsvDetailDrawer';
 import { SiteDetailDrawer } from './components/drawers/SiteDetailDrawer';
 import { ClusterDetailDrawer } from './components/drawers/ClusterDetailDrawer';
 import type { Sample, ASV, Occurrence, Expedition } from './domain/types';
-import { createExpeditionFromUploads } from './services/dataService';
+import { createExpeditionFromUploads, setRepository } from './services/dataService';
 import {
   getLocalProfile,
   setLocalProfile,
@@ -154,6 +154,7 @@ const MainAppContent: React.FC = () => {
     return (
       <ResearcherLogin
         onLoginSuccess={(profile) => {
+          setRepository(null); // Reset so next getRepository() picks up fresh Supabase repo for this user
           setResearcherProfile(profile);
           setResearcherUser(profile.full_name || profile.display_name || profile.email);
           setScreen('home');
@@ -170,6 +171,7 @@ const MainAppContent: React.FC = () => {
         onOpenExpedition={handleOpenExistingExpedition}
         onNewExpedition={handleStartNewExpedition}
         onLogout={() => {
+          setRepository(null); // Reset repo so next login starts fresh
           setResearcherProfile(null);
           setLocalProfile(null);
           setScreen('landing');

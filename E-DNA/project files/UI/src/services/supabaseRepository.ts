@@ -18,6 +18,7 @@ import type {
   ExpeditionSummaryItem,
   BatchProgressCallback,
 } from './repositoryTypes';
+import { ensureUUID } from '../lib/uuid';
 
 const BATCH_SIZE_SAMPLES = 500;
 const BATCH_SIZE_ASVS = 500;
@@ -101,14 +102,15 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
   }
 
   async listExpeditions(): Promise<ExpeditionSummaryItem[]> {
-    const items: ExpeditionSummaryItem[] = [];
+    const uploadedItems: ExpeditionSummaryItem[] = [];
 
-    // 1. Fetch remote uploaded expeditions from Supabase
+    // 1. Fetch remote uploaded expeditions from Supabase (RLS ensures only this user's own)
     if (supabase) {
       try {
         const { data, error } = await supabase
           .from('expeditions')
           .select('id, name, region, provenance, updated_at, created_at')
+          .eq('provenance', 'uploaded')
           .order('created_at', { ascending: false });
 
         if (error) {
@@ -126,7 +128,7 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
               .select('*', { count: 'exact', head: true })
               .eq('expedition_id', exp.id);
 
-            items.push({
+            uploadedItems.push({
               id: exp.id,
               name: exp.name,
               region: exp.region,
@@ -143,21 +145,23 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
       }
     }
 
-    // 2. Append local demo reference expeditions
+    // 2. Build demo items from local demoStore (always visible to everyone, never stored in cloud)
+    const demoItems: ExpeditionSummaryItem[] = [];
     demoStore.forEach((exp) => {
-      items.push({
+      demoItems.push({
         id: exp.id,
         name: exp.name,
         region: exp.region,
         samples: exp.samples.length,
         asvs: exp.asvs.length,
-        status: 'Local Reference',
+        status: 'Standard Demo',
         provenance: 'demo',
         updated: exp.updated,
       });
     });
 
-    return items;
+    // Demos first, then user's own uploaded expeditions
+    return [...demoItems, ...uploadedItems];
   }
 
   async getExpedition(id: string): Promise<Expedition | null> {
@@ -266,6 +270,10 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
 
     if (onProgress) onProgress('Preparing dataset', 0, 1);
 
+    // Ensure expedition.id conforms to Supabase PostgreSQL UUID format
+    const validExpId = ensureUUID(expedition.id);
+    expedition.id = validExpId;
+
     // Get current authenticated user if logged in
     const {
       data: { user },
@@ -274,7 +282,7 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
     // Stage 1: Insert Expedition Header
     if (onProgress) onProgress('Uploading expedition', 0, 1);
     const { error: expError } = await supabase.from('expeditions').upsert({
-      id: expedition.id,
+      id: validExpId,
       researcher_id: user?.id || null,
       name: expedition.name,
       region: expedition.region,
@@ -290,7 +298,7 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
 
     // Stage 2: Batch Insert Samples
     const sampleRows = expedition.samples.map((s) => ({
-      expedition_id: expedition.id,
+      expedition_id: validExpId,
       sample_id: s.sample_id,
       site: s.site,
       latitude: s.latitude !== undefined ? s.latitude : null,
@@ -310,7 +318,7 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
 
     // Stage 3: Batch Insert ASVs
     const asvRows = expedition.asvs.map((a) => ({
-      expedition_id: expedition.id,
+      expedition_id: validExpId,
       asv_id: a.asv_id,
       sequence: a.sequence,
       sequence_length: a.sequence.length,
@@ -335,7 +343,7 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
 
     // Stage 4: Batch Insert Occurrences
     const occurrenceRows = expedition.occurrences.map((o) => ({
-      expedition_id: expedition.id,
+      expedition_id: validExpId,
       asv_id: o.asv_id,
       sample_id: o.sample_id,
       abundance: o.abundance,

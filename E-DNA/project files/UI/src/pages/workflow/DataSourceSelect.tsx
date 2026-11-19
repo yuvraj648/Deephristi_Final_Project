@@ -5,7 +5,7 @@
 
 import React, { useState, useRef } from 'react';
 import { ArrowLeft, Upload, FileCode, Dna, CheckCircle2, AlertCircle, FileText, Check, ArrowRight } from 'lucide-react';
-import { parseAsvTable, parseSampleMetadata } from '../../services/dataService';
+import { parseAsvTable, parseSampleMetadata, inferSampleMetadataFromId } from '../../services/dataService';
 import type { ASV, Occurrence, Sample, ValidationWarning } from '../../domain/types';
 
 interface DataSourceSelectProps {
@@ -39,6 +39,7 @@ export const DataSourceSelect: React.FC<DataSourceSelectProps> = ({
     asvs: ASV[];
     occurrences: Occurrence[];
     sampleIds: string[];
+    samples?: Sample[];
     warnings: ValidationWarning[];
   } | null>(null);
 
@@ -80,6 +81,7 @@ export const DataSourceSelect: React.FC<DataSourceSelectProps> = ({
           asvs: result.asvs,
           occurrences: result.occurrences,
           sampleIds: result.sampleIds,
+          samples: result.samples,
           warnings: result.warnings,
         });
         setIsProcessing(false);
@@ -204,33 +206,100 @@ SMP_003\tStation S03 - Bathyal Margin\t14.85\t68.80\t1200\t2026-03-18\tR1`;
       return;
     }
 
-    // Resolve unified samples
-    let unifiedSamples: Sample[] = [];
+    // Resolve unified samples - STRICTLY scoped to the uploaded dataset
     const sampleIdMap = new Map<string, Sample>();
 
-    // 1. If metadata file was uploaded, seed from metadata
+    // 1. If metadata file was uploaded, seed metadata records
     if (metadataFile && metadataFile.samples.length > 0) {
       metadataFile.samples.forEach((s) => sampleIdMap.set(s.sample_id, s));
-    } else if (stagedInitialSamples && stagedInitialSamples.length > 0) {
-      stagedInitialSamples.forEach((s) => sampleIdMap.set(s.sample_id, s));
     }
 
-    // 2. Ensure every sample column from ASV table is represented in samples array
+    // 2. If samples were parsed directly from the ASV table (e.g. depth/site/replicate inferred from long format)
+    if (asvFile.samples && asvFile.samples.length > 0) {
+      asvFile.samples.forEach((s) => {
+        if (!sampleIdMap.has(s.sample_id)) {
+          sampleIdMap.set(s.sample_id, s);
+        } else {
+          // Merge metadata
+          const existing = sampleIdMap.get(s.sample_id)!;
+          sampleIdMap.set(s.sample_id, {
+            ...s,
+            ...existing,
+            depth: existing.depth !== undefined ? existing.depth : s.depth,
+            replicate: existing.replicate || s.replicate,
+          });
+        }
+      });
+    }
+
+    // 3. If stagedInitialSamples was passed from Step 1, ONLY merge coordinates/depth
+    // for sample IDs that ACTUALLY EXIST in asvFile.sampleIds!
+    // Never allow unmatched dummy stations (e.g. SMP_001, SMP_002, SMP_003) to leak into uploaded dataset!
+    if (stagedInitialSamples && stagedInitialSamples.length > 0) {
+      stagedInitialSamples.forEach((initS) => {
+        if (asvFile.sampleIds.includes(initS.sample_id)) {
+          const existing = sampleIdMap.get(initS.sample_id);
+          sampleIdMap.set(initS.sample_id, {
+            ...existing,
+            ...initS,
+          });
+        }
+      });
+    }
+
+    // 4. Ensure every sample column from ASV table is represented in samples array
     asvFile.sampleIds.forEach((sid) => {
       if (!sampleIdMap.has(sid)) {
-        sampleIdMap.set(sid, {
-          sample_id: sid,
-          site: sid,
-          latitude: undefined,
-          longitude: undefined,
-          depth: undefined,
-          date: undefined,
-          replicate: undefined,
-        });
+        sampleIdMap.set(sid, inferSampleMetadataFromId(sid));
       }
     });
 
-    unifiedSamples = Array.from(sampleIdMap.values());
+    // 5. If samples lack GPS coordinates, auto-assign along transect so stations are placed on the map
+    const samplesArray = Array.from(sampleIdMap.values());
+    const needsCoords = samplesArray.some((s) => s.latitude === undefined || s.longitude === undefined);
+    if (needsCoords) {
+      const uniqueSites = Array.from(new Set(samplesArray.map((s) => s.site)));
+      const count = uniqueSites.length;
+
+      let startLat = 15.0;
+      let endLat = 19.5;
+      let startLng = 68.5;
+      let endLng = 72.8;
+
+      if (stagedInitialSamples && stagedInitialSamples.length > 0) {
+        const validStaged = stagedInitialSamples.filter((s) => s.latitude !== undefined && s.longitude !== undefined);
+        if (validStaged.length >= 2) {
+          startLat = validStaged[0].latitude!;
+          startLng = validStaged[0].longitude!;
+          endLat = validStaged[validStaged.length - 1].latitude!;
+          endLng = validStaged[validStaged.length - 1].longitude!;
+        } else if (validStaged.length === 1) {
+          startLat = validStaged[0].latitude!;
+          startLng = validStaged[0].longitude!;
+          endLat = startLat + 2.0;
+          endLng = startLng + 2.0;
+        }
+      }
+
+      uniqueSites.forEach((siteName, idx) => {
+        const frac = count > 1 ? idx / (count - 1) : 0.5;
+        const lat = Number((startLat + frac * (endLat - startLat)).toFixed(4));
+        const lng = Number((startLng + frac * (endLng - startLng)).toFixed(4));
+
+        samplesArray.forEach((s) => {
+          if (s.site === siteName && (s.latitude === undefined || s.longitude === undefined)) {
+            s.latitude = lat;
+            s.longitude = lng;
+          }
+        });
+      });
+    }
+
+    // 6. CRITICAL: Filter unifiedSamples to ONLY contain samples in asvFile.sampleIds!
+    const validSampleIds = new Set(asvFile.sampleIds);
+    const unifiedSamples = samplesArray.filter((s) =>
+      validSampleIds.has(s.sample_id)
+    );
 
     const combinedWarnings = [
       ...asvFile.warnings,

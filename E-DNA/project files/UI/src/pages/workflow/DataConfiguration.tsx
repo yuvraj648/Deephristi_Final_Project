@@ -5,7 +5,7 @@
 // ========================================================
 
 import React, { useState } from 'react';
-import { ArrowLeft, ArrowRight, RefreshCw, CheckCircle2, AlertTriangle, XCircle, Info } from 'lucide-react';
+import { ArrowLeft, ArrowRight, RefreshCw, CheckCircle2, AlertTriangle, XCircle, Info, MapPin, Sparkles } from 'lucide-react';
 import type { Sample, ASV, Occurrence, ValidationResult } from '../../domain/types';
 import { validateDataset } from '../../services/dataService';
 
@@ -47,11 +47,72 @@ export const DataConfiguration: React.FC<DataConfigurationProps> = ({
     runValidation(updated);
   };
 
+  const applyPresetCoordinates = (region: 'arabian_sea' | 'bay_of_bengal' | 'monterey_bay' | 'clear') => {
+    if (region === 'clear') {
+      const updated = samples.map((s) => ({ ...s, latitude: undefined, longitude: undefined }));
+      setSamples(updated);
+      runValidation(updated);
+      return;
+    }
+
+    // Group samples by unique site/station prefix
+    const stationGroups = new Map<string, Sample[]>();
+    samples.forEach((s) => {
+      const stationKey = s.site ? s.site.split('_')[0] : s.sample_id.split('_')[0];
+      if (!stationGroups.has(stationKey)) {
+        stationGroups.set(stationKey, []);
+      }
+      stationGroups.get(stationKey)!.push(s);
+    });
+
+    const uniqueStationKeys = Array.from(stationGroups.keys());
+    const count = uniqueStationKeys.length;
+
+    let startLat = 15.0;
+    let endLat = 19.5;
+    let startLng = 68.5;
+    let endLng = 72.8;
+
+    if (region === 'bay_of_bengal') {
+      startLat = 13.0;
+      endLat = 18.5;
+      startLng = 82.0;
+      endLng = 88.0;
+    } else if (region === 'monterey_bay') {
+      startLat = 36.6;
+      endLat = 36.9;
+      startLng = -122.4;
+      endLng = -121.8;
+    }
+
+    const updated = samples.map((s) => {
+      const stationKey = s.site ? s.site.split('_')[0] : s.sample_id.split('_')[0];
+      const stationIdx = uniqueStationKeys.indexOf(stationKey);
+      const frac = count > 1 ? stationIdx / (count - 1) : 0.5;
+
+      const lat = Number((startLat + frac * (endLat - startLat)).toFixed(3));
+      const lng = Number((startLng + frac * (endLng - startLng)).toFixed(3));
+
+      return {
+        ...s,
+        latitude: lat,
+        longitude: lng,
+      };
+    });
+
+    setSamples(updated);
+    runValidation(updated);
+  };
+
   const handleContinue = () => {
-    const currentValidation = validateDataset(samples, asvs, occurrences, abundanceSampleIds);
-    setValidation(currentValidation);
-    if (!currentValidation.valid) return;
-    onProceed({ samples, asvs, occurrences });
+    try {
+      const currentValidation = validateDataset(samples, asvs, occurrences, abundanceSampleIds);
+      setValidation(currentValidation);
+      if (!currentValidation.valid) return;
+      onProceed({ samples, asvs, occurrences });
+    } catch (err: any) {
+      console.error('Failed to proceed from DataConfiguration:', err);
+    }
   };
 
   const seqMin = validation.sequenceLengthRange ? validation.sequenceLengthRange[0] : 0;
@@ -297,18 +358,51 @@ export const DataConfiguration: React.FC<DataConfigurationProps> = ({
             3. SAMPLE METADATA CONFIGURATION TABLE
             ======================================================== */}
         <div className="bg-paper-raised border border-rule rounded-plate overflow-hidden">
-          <div className="px-4 py-3 bg-paper-sunk/40 border-b border-rule flex items-center justify-between">
+          <div className="px-4 py-3 bg-paper-sunk/40 border-b border-rule flex flex-wrap items-center justify-between gap-3">
             <div>
               <span className="font-serif text-[16px] font-medium text-ink">
                 Sample Field Metadata Configuration
               </span>
               <span className="text-[11px] font-mono text-ink-faint block mt-0.5">
-                Missing coordinates and depths remain N/A — never converted to 0
+                Dynamic records parsed from dataset • Missing coordinates remain N/A until configured
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] font-mono text-ink-muted">
-              <Info size={13} />
-              <span>Direct cell editing enabled</span>
+
+            {/* Quick Georeference Preset Toolbar */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono text-ink-muted flex items-center gap-1">
+                <Sparkles size={13} className="text-survey" />
+                <span>Auto-Georeference:</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => applyPresetCoordinates('arabian_sea')}
+                className="px-2 py-1 bg-paper hover:bg-paper-sunk border border-rule hover:border-survey text-[11px] font-mono text-ink rounded-control transition-colors"
+                title="Distribute stations along Eastern Arabian Sea transect"
+              >
+                Arabian Sea
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPresetCoordinates('bay_of_bengal')}
+                className="px-2 py-1 bg-paper hover:bg-paper-sunk border border-rule hover:border-survey text-[11px] font-mono text-ink rounded-control transition-colors"
+                title="Distribute stations along Bay of Bengal transect"
+              >
+                Bay of Bengal
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPresetCoordinates('clear')}
+                className="px-2 py-1 bg-paper hover:bg-paper-sunk border border-rule hover:border-error/40 text-[11px] font-mono text-ink-muted hover:text-error rounded-control transition-colors"
+                title="Clear all assigned coordinates"
+              >
+                Clear
+              </button>
+              <div className="h-4 w-[1px] bg-rule mx-1 hidden sm:block" />
+              <div className="flex items-center gap-1.5 text-[11px] font-mono text-ink-muted">
+                <Info size={13} />
+                <span>Editable</span>
+              </div>
             </div>
           </div>
 
