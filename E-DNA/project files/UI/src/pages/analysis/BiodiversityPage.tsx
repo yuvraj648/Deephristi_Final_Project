@@ -618,10 +618,15 @@ export const BiodiversityPage: React.FC = () => {
           (z-[99999] prevents any map overlap or bleed-through)
           ======================================================== */}
       {showGuideModal && (
-        <div className="fixed inset-0 z-[99999] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#05080E] border border-rule/80 rounded-plate max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl p-6 space-y-6 font-sans">
-            {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-rule pb-4">
+        <div
+          className="fixed inset-0 z-[99999] bg-black/90 backdrop-blur-md flex justify-center items-start overflow-y-auto p-4 pt-16 sm:pt-20 pb-12"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowGuideModal(false);
+          }}
+        >
+          <div className="bg-[#05080E] border border-rule/80 rounded-plate max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl font-sans relative my-auto">
+            {/* Pinned Modal Header */}
+            <div className="p-5 border-b border-rule flex items-start justify-between bg-[#05080E] rounded-t-plate flex-shrink-0">
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold tracking-wider border border-sky-500/40 text-sky-400 bg-sky-950/40">
@@ -648,105 +653,108 @@ export const BiodiversityPage: React.FC = () => {
               </button>
             </div>
 
-            {/* Whittaker Equation Banner */}
-            <div className="p-4 bg-sky-950/30 rounded border border-sky-500/30 space-y-2">
-              <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase text-sky-400">
-                <Sparkles size={15} />
-                <span>Whittaker's Biodiversity Decomposition Theorem</span>
+            {/* Scrollable Modal Content */}
+            <div className="p-5 overflow-y-auto space-y-4 flex-1">
+              {/* Whittaker Equation Banner */}
+              <div className="p-4 bg-sky-950/30 rounded border border-sky-500/30 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase text-sky-400">
+                  <Sparkles size={15} />
+                  <span>Whittaker's Biodiversity Decomposition Theorem</span>
+                </div>
+                <div className="p-2.5 bg-[#030a13] rounded border border-sky-500/20 text-center font-mono text-sm text-sky-300 font-bold">
+                  Gamma Diversity (γ) = Mean Alpha Diversity (ᾱ) × Beta Turnover (β)
+                </div>
+                <p className="text-xs text-neutral-200 leading-relaxed font-sans">
+                  In simple words: <strong>Alpha</strong> is the species diversity in a single drop of water / one station; <strong>Beta</strong> is how much the species change as you travel between stations or dive deeper; and <strong>Gamma</strong> is the complete species pool of the entire ocean region.
+                </p>
               </div>
-              <div className="p-2.5 bg-[#030a13] rounded border border-sky-500/20 text-center font-mono text-sm text-sky-300 font-bold">
-                Gamma Diversity (γ) = Mean Alpha Diversity (ᾱ) × Beta Turnover (β)
+
+              {/* 3 Pillar Cards (Alpha, Beta, Gamma) */}
+              <div className="space-y-4">
+                {/* Alpha Card */}
+                <div className="p-4 bg-paper-sunk rounded border border-rule space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-sky-900/50 text-sky-300 font-mono text-[10px] font-bold border border-sky-700">
+                        ALPHA (α)
+                      </span>
+                      <h3 className="text-sm font-bold text-white">
+                        Within-Sample Local Diversity
+                      </h3>
+                    </div>
+                    <span className="text-[11px] font-mono text-emerald-400 font-semibold">Local Site Level</span>
+                  </div>
+                  <p className="text-xs text-neutral-300 leading-relaxed">
+                    <strong>What it means:</strong> Measures the biological richness and community balance at one specific sampling location or water sample.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] font-mono pt-1">
+                    <div className="p-2 bg-[#050f1e] rounded border border-rule/60">
+                      <span className="text-sky-300 font-bold block">Shannon Index (H')</span>
+                      <span className="text-neutral-300 font-sans text-[10px]">Quantifies biological entropy. Higher values mean higher richness and abundance balance.</span>
+                    </div>
+                    <div className="p-2 bg-[#050f1e] rounded border border-rule/60">
+                      <span className="text-sky-300 font-bold block">Simpson (1 - D)</span>
+                      <span className="text-neutral-300 font-sans text-[10px]">Probability two random DNA reads differ. Measures resistance to single-species dominance.</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Beta Card */}
+                <div className="p-4 bg-paper-sunk rounded border border-rule space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-emerald-900/50 text-emerald-300 font-mono text-[10px] font-bold border border-emerald-700">
+                        BETA (β)
+                      </span>
+                      <h3 className="text-sm font-bold text-white">
+                        Between-Site Community Turnover
+                      </h3>
+                    </div>
+                    <span className="text-[11px] font-mono text-emerald-400 font-semibold">Spatial & Depth Gradient</span>
+                  </div>
+                  <p className="text-xs text-neutral-300 leading-relaxed">
+                    <strong>What it means:</strong> Measures how much the species composition changes when you travel from one station to another, or from shallow waters into the deep bathypelagic abyss.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] font-mono pt-1">
+                    <div className="p-2 bg-[#050f1e] rounded border border-rule/60">
+                      <span className="text-emerald-300 font-bold block">Bray-Curtis Dissimilarity</span>
+                      <span className="text-neutral-300 font-sans text-[10px]">Abundance-weighted distance (0 = identical; 1 = completely different species).</span>
+                    </div>
+                    <div className="p-2 bg-[#050f1e] rounded border border-rule/60">
+                      <span className="text-emerald-300 font-bold block">Jaccard Distance</span>
+                      <span className="text-neutral-300 font-sans text-[10px]">Presence/absence turnover evaluating pure species replacement.</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Gamma Card */}
+                <div className="p-4 bg-paper-sunk rounded border border-rule space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-purple-900/50 text-purple-300 font-mono text-[10px] font-bold border border-purple-700">
+                        GAMMA (γ)
+                      </span>
+                      <h3 className="text-sm font-bold text-white">
+                        Total Regional Species Pool
+                      </h3>
+                    </div>
+                    <span className="text-[11px] font-mono text-purple-400 font-semibold">Broad Regional Biome</span>
+                  </div>
+                  <p className="text-xs text-neutral-300 leading-relaxed">
+                    <strong>What it means:</strong> Represents the total cumulative biodiversity cataloged across all sampled locations in the entire Arabian Sea study region.
+                  </p>
+                  <div className="p-2 bg-[#050f1e] rounded border border-rule/60 text-[11px] font-mono">
+                    <span className="text-purple-300 font-bold block">Whittaker Ratio (β = γ / ᾱ)</span>
+                    <span className="text-neutral-300 font-sans text-[10px]">
+                      Current expedition ratio: <strong>{whittakerBeta}×</strong>. Indicates regional richness is {whittakerBeta} times higher than average local samples due to strong environmental depth partitioning.
+                    </span>
+                  </div>
+                </div>
               </div>
-              <p className="text-xs text-neutral-200 leading-relaxed font-sans">
-                In simple words: <strong>Alpha</strong> is the species diversity in a single drop of water / one station; <strong>Beta</strong> is how much the species change as you travel between stations or dive deeper; and <strong>Gamma</strong> is the complete species pool of the entire ocean region.
-              </p>
             </div>
 
-            {/* 3 Pillar Cards (Alpha, Beta, Gamma) */}
-            <div className="space-y-4">
-              {/* Alpha Card */}
-              <div className="p-4 bg-paper-sunk rounded border border-rule space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded bg-sky-900/50 text-sky-300 font-mono text-[10px] font-bold border border-sky-700">
-                      ALPHA (α)
-                    </span>
-                    <h3 className="text-sm font-bold text-white">
-                      Within-Sample Local Diversity
-                    </h3>
-                  </div>
-                  <span className="text-[11px] font-mono text-emerald-400 font-semibold">Local Site Level</span>
-                </div>
-                <p className="text-xs text-neutral-300 leading-relaxed">
-                  <strong>What it means:</strong> Measures the biological richness and community balance at one specific sampling location or water sample.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] font-mono pt-1">
-                  <div className="p-2 bg-[#050f1e] rounded border border-rule/60">
-                    <span className="text-sky-300 font-bold block">Shannon Index (H')</span>
-                    <span className="text-neutral-300 font-sans text-[10px]">Quantifies biological entropy. Higher values mean higher richness and abundance balance.</span>
-                  </div>
-                  <div className="p-2 bg-[#050f1e] rounded border border-rule/60">
-                    <span className="text-sky-300 font-bold block">Simpson (1 - D)</span>
-                    <span className="text-neutral-300 font-sans text-[10px]">Probability two random DNA reads differ. Measures resistance to single-species dominance.</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Beta Card */}
-              <div className="p-4 bg-paper-sunk rounded border border-rule space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded bg-emerald-900/50 text-emerald-300 font-mono text-[10px] font-bold border border-emerald-700">
-                      BETA (β)
-                    </span>
-                    <h3 className="text-sm font-bold text-white">
-                      Between-Site Community Turnover
-                    </h3>
-                  </div>
-                  <span className="text-[11px] font-mono text-emerald-400 font-semibold">Spatial & Depth Gradient</span>
-                </div>
-                <p className="text-xs text-neutral-300 leading-relaxed">
-                  <strong>What it means:</strong> Measures how much the species composition changes when you travel from one station to another, or from shallow waters into the deep bathypelagic abyss.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] font-mono pt-1">
-                  <div className="p-2 bg-[#050f1e] rounded border border-rule/60">
-                    <span className="text-emerald-300 font-bold block">Bray-Curtis Dissimilarity</span>
-                    <span className="text-neutral-300 font-sans text-[10px]">Abundance-weighted distance (0 = identical; 1 = completely different species).</span>
-                  </div>
-                  <div className="p-2 bg-[#050f1e] rounded border border-rule/60">
-                    <span className="text-emerald-300 font-bold block">Jaccard Distance</span>
-                    <span className="text-neutral-300 font-sans text-[10px]">Presence/absence turnover evaluating pure species replacement.</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Gamma Card */}
-              <div className="p-4 bg-paper-sunk rounded border border-rule space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded bg-purple-900/50 text-purple-300 font-mono text-[10px] font-bold border border-purple-700">
-                      GAMMA (γ)
-                    </span>
-                    <h3 className="text-sm font-bold text-white">
-                      Total Regional Species Pool
-                    </h3>
-                  </div>
-                  <span className="text-[11px] font-mono text-purple-400 font-semibold">Broad Regional Biome</span>
-                </div>
-                <p className="text-xs text-neutral-300 leading-relaxed">
-                  <strong>What it means:</strong> Represents the total cumulative biodiversity cataloged across all sampled locations in the entire Arabian Sea study region.
-                </p>
-                <div className="p-2 bg-[#050f1e] rounded border border-rule/60 text-[11px] font-mono">
-                  <span className="text-purple-300 font-bold block">Whittaker Ratio (β = γ / ᾱ)</span>
-                  <span className="text-neutral-300 font-sans text-[10px]">
-                    Current expedition ratio: <strong>{whittakerBeta}×</strong>. Indicates regional richness is {whittakerBeta} times higher than average local samples due to strong environmental depth partitioning.
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex justify-between items-center border-t border-rule pt-4">
+            {/* Pinned Modal Footer */}
+            <div className="px-5 py-3.5 border-t border-rule flex justify-between items-center bg-[#05080E] rounded-b-plate flex-shrink-0">
               <span className="text-[10px] font-mono text-ink-faint">
                 SCIENTIFIC CALIBRATION • DEEPDRISHTI ECOLOGICAL ENGINE
               </span>

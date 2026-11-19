@@ -937,10 +937,15 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
           (z-[99999] prevents any map overlap or bleed-through)
           ======================================================== */}
       {selectedModelDetail && (
-        <div className="fixed inset-0 z-[99999] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#05080E] border border-rule/80 rounded-plate max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl p-6 space-y-6 font-sans">
-            {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-rule pb-4">
+        <div
+          className="fixed inset-0 z-[99999] bg-black/90 backdrop-blur-md flex justify-center items-start overflow-y-auto p-4 pt-16 sm:pt-20 pb-12"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedModelDetail(null);
+          }}
+        >
+          <div className="bg-[#05080E] border border-rule/80 rounded-plate max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl font-sans relative my-auto">
+            {/* Pinned Modal Header */}
+            <div className="p-5 border-b border-rule flex items-start justify-between bg-[#05080E] rounded-t-plate flex-shrink-0">
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold tracking-wider border ${selectedModelDetail.badgeColor}`}>
@@ -967,104 +972,107 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
               </button>
             </div>
 
-            {/* Benchmark Metrics Strip */}
-            <div className="grid grid-cols-3 gap-3 font-mono text-xs">
-              <div className="p-3 bg-paper-sunk rounded border border-rule">
-                <span className="text-[10px] text-ink-faint block uppercase">Validation Accuracy</span>
-                <span className="text-base font-bold text-emerald-400">{selectedModelDetail.accuracy}</span>
-              </div>
-              <div className="p-3 bg-paper-sunk rounded border border-rule">
-                <span className="text-[10px] text-ink-faint block uppercase">Macro F1 Score</span>
-                <span className="text-base font-bold text-survey">{selectedModelDetail.macroF1}</span>
-              </div>
-              <div className="p-3 bg-paper-sunk rounded border border-rule">
-                <span className="text-[10px] text-ink-faint block uppercase">Inference Latency</span>
-                <span className="text-base font-bold text-ink">{selectedModelDetail.latency}</span>
-              </div>
-            </div>
-
-            {/* Plain English Summary (Human Understandable) */}
-            <div className="p-4 bg-sky-950/30 rounded border border-sky-500/30 space-y-2">
-              <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase text-sky-400">
-                <Sparkles size={15} />
-                <span>Plain-English Summary (How it Works in Simple Words)</span>
-              </div>
-              <p className="text-xs text-neutral-200 leading-relaxed font-sans">
-                {selectedModelDetail.plainEnglishExplanation}
-              </p>
-            </div>
-
-            {/* Human-Understandable Mathematical Formulas & Step-by-Step Logic */}
-            <div className="p-4 bg-[#0a1525] rounded border border-sky-500/30 space-y-3 font-sans">
-              <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase text-sky-400">
-                <Binary size={15} />
-                <span>{selectedModelDetail.formulaTitle}</span>
+            {/* Scrollable Modal Content */}
+            <div className="p-5 overflow-y-auto space-y-5 flex-1">
+              {/* Benchmark Metrics Strip */}
+              <div className="grid grid-cols-3 gap-3 font-mono text-xs">
+                <div className="p-3 bg-paper-sunk rounded border border-rule">
+                  <span className="text-[10px] text-ink-faint block uppercase">Validation Accuracy</span>
+                  <span className="text-base font-bold text-emerald-400">{selectedModelDetail.accuracy}</span>
+                </div>
+                <div className="p-3 bg-paper-sunk rounded border border-rule">
+                  <span className="text-[10px] text-ink-faint block uppercase">Macro F1 Score</span>
+                  <span className="text-base font-bold text-survey">{selectedModelDetail.macroF1}</span>
+                </div>
+                <div className="p-3 bg-paper-sunk rounded border border-rule">
+                  <span className="text-[10px] text-ink-faint block uppercase">Inference Latency</span>
+                  <span className="text-base font-bold text-ink">{selectedModelDetail.latency}</span>
+                </div>
               </div>
 
-              {/* Master Formula Display Banner */}
-              <div className="p-3 bg-[#030a13] rounded border border-sky-500/30 text-center text-sm font-mono text-sky-300 font-bold overflow-x-auto leading-relaxed">
-                {selectedModelDetail.formulaDisplay}
+              {/* Plain English Summary (Human Understandable) */}
+              <div className="p-4 bg-sky-950/30 rounded border border-sky-500/30 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase text-sky-400">
+                  <Sparkles size={15} />
+                  <span>Plain-English Summary (How it Works in Simple Words)</span>
+                </div>
+                <p className="text-xs text-neutral-200 leading-relaxed font-sans">
+                  {selectedModelDetail.plainEnglishExplanation}
+                </p>
               </div>
-              <p className="text-[11px] text-neutral-300 leading-relaxed">
-                {selectedModelDetail.formulaDesc}
-              </p>
 
-              {/* Step-by-step logic cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-2">
-                {selectedModelDetail.humanLogic.map((hl, idx) => (
-                  <div key={idx} className="p-3 bg-[#050f1e] rounded border border-rule space-y-1">
-                    <div className="flex items-center justify-between text-[10px] font-mono">
-                      <span className="px-1.5 py-0.5 rounded bg-sky-900/60 text-sky-300 font-bold">{hl.step}</span>
-                      <span className="text-ink-muted">{hl.label}</span>
+              {/* Human-Understandable Mathematical Formulas & Step-by-Step Logic */}
+              <div className="p-4 bg-[#0a1525] rounded border border-sky-500/30 space-y-3 font-sans">
+                <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase text-sky-400">
+                  <Binary size={15} />
+                  <span>{selectedModelDetail.formulaTitle}</span>
+                </div>
+
+                {/* Master Formula Display Banner */}
+                <div className="p-3 bg-[#030a13] rounded border border-sky-500/30 text-center text-sm font-mono text-sky-300 font-bold overflow-x-auto leading-relaxed">
+                  {selectedModelDetail.formulaDisplay}
+                </div>
+                <p className="text-[11px] text-neutral-300 leading-relaxed">
+                  {selectedModelDetail.formulaDesc}
+                </p>
+
+                {/* Step-by-step logic cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-2">
+                  {selectedModelDetail.humanLogic.map((hl, idx) => (
+                    <div key={idx} className="p-3 bg-[#050f1e] rounded border border-rule space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-mono">
+                        <span className="px-1.5 py-0.5 rounded bg-sky-900/60 text-sky-300 font-bold">{hl.step}</span>
+                        <span className="text-ink-muted">{hl.label}</span>
+                      </div>
+                      <div className="text-xs font-mono font-semibold text-emerald-300 pt-0.5">
+                        {hl.formula}
+                      </div>
+                      <p className="text-[11px] text-neutral-300 leading-tight pt-1">
+                        {hl.detail}
+                      </p>
                     </div>
-                    <div className="text-xs font-mono font-semibold text-emerald-300 pt-0.5">
-                      {hl.formula}
+                  ))}
+                </div>
+              </div>
+
+              {/* Training Dataset Section */}
+              <div className="p-4 bg-paper-sunk rounded border border-rule space-y-2">
+                <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase text-survey">
+                  <Dna size={15} />
+                  <span>Training Dataset & Biological Reference</span>
+                </div>
+                <h4 className="text-sm font-bold text-white">
+                  {selectedModelDetail.datasetName}
+                </h4>
+                <p className="text-xs text-neutral-300 leading-relaxed">
+                  {selectedModelDetail.datasetDesc}
+                </p>
+                <div className="pt-1 text-[11px] font-mono text-emerald-400">
+                  Trained on: <strong>{selectedModelDetail.specimensTrained}</strong>
+                </div>
+              </div>
+
+              {/* Step-by-Step Bioinformatic Flow */}
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase text-survey">
+                  <Layers size={15} />
+                  <span>Computational Pipeline & Inference Flow</span>
+                </div>
+                <div className="space-y-1.5 font-mono text-xs">
+                  {selectedModelDetail.pipelineFlow.map((step, idx) => (
+                    <div key={idx} className="p-2.5 bg-paper rounded border border-rule flex items-center gap-3">
+                      <span className="px-2 py-0.5 rounded bg-sky-950 text-sky-400 font-bold text-[10px] border border-sky-800">
+                        Step {idx + 1}
+                      </span>
+                      <span className="text-white font-medium">{step}</span>
                     </div>
-                    <p className="text-[11px] text-neutral-300 leading-tight pt-1">
-                      {hl.detail}
-                    </p>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* Training Dataset Section */}
-            <div className="p-4 bg-paper-sunk rounded border border-rule space-y-2">
-              <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase text-survey">
-                <Dna size={15} />
-                <span>Training Dataset & Biological Reference</span>
-              </div>
-              <h4 className="text-sm font-bold text-white">
-                {selectedModelDetail.datasetName}
-              </h4>
-              <p className="text-xs text-neutral-300 leading-relaxed">
-                {selectedModelDetail.datasetDesc}
-              </p>
-              <div className="pt-1 text-[11px] font-mono text-emerald-400">
-                Trained on: <strong>{selectedModelDetail.specimensTrained}</strong>
-              </div>
-            </div>
-
-            {/* Step-by-Step Bioinformatic Flow */}
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase text-survey">
-                <Layers size={15} />
-                <span>Computational Pipeline & Inference Flow</span>
-              </div>
-              <div className="space-y-1.5 font-mono text-xs">
-                {selectedModelDetail.pipelineFlow.map((step, idx) => (
-                  <div key={idx} className="p-2.5 bg-paper rounded border border-rule flex items-center gap-3">
-                    <span className="px-2 py-0.5 rounded bg-sky-950 text-sky-400 font-bold text-[10px] border border-sky-800">
-                      Step {idx + 1}
-                    </span>
-                    <span className="text-white font-medium">{step}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex justify-between items-center border-t border-rule pt-4">
+            {/* Pinned Modal Footer */}
+            <div className="px-5 py-3.5 border-t border-rule flex justify-between items-center bg-[#05080E] rounded-b-plate flex-shrink-0">
               <span className="text-[10px] font-mono text-ink-faint">
                 SCIENTIFIC INTEGRITY VERIFIED • DEEPDRISHTI ML BENCHMARK
               </span>
