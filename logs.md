@@ -331,3 +331,8 @@ All five local endpoints returned HTTP 200 during the verification on 2026-11-18
 - `npm.cmd run lint` passed with pre-existing warnings in unrelated files.
 - `npx.cmd vite build` passed with existing chunk-size and dynamic-import warnings.
 - `npm.cmd run build` remains blocked by pre-existing unused imports in `AsvExplorerPage.tsx`, `ComparePage.tsx`, `NoveltyPage.tsx`, and `ReportPage.tsx`; it reported no errors in the hero changes.
+
+## 18. 2026-11-19 - Correct cinematic hero startup frame
+
+- The hero's poster previously showed a later submarine frame while the video was still loading, making the initial screen differ from the clip's ocean-surface opening.
+- Replaced the poster with a frame from the opening half-second of the 60 FPS clip so the initial/loading view matches the intended second reference image and the video sequence.
