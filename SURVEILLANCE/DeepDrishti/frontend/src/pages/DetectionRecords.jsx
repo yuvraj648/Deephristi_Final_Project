@@ -272,7 +272,15 @@ const DetectionRecords = () => {
           {/* Detection Preview Panel */}
           <section className="col-span-5 bg-background-dark flex flex-col min-h-0 h-full overflow-hidden">
             {selectedDetection ? (
-              <DetectionPreview detection={selectedDetection} />
+              <DetectionPreview
+                detection={selectedDetection}
+                onUpdateDetection={(updated) => {
+                  setSelectedDetection(updated);
+                  setDetections((prev) =>
+                    prev.map((d) => (d.id === updated.id ? { ...d, ...updated } : d))
+                  );
+                }}
+              />
             ) : (
               <div className="flex-1 flex items-center justify-center text-slate-500">
                 <div className="text-center">

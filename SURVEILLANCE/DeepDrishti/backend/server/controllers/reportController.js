@@ -88,11 +88,16 @@ exports.getReportsAnalytics = async (req, res) => {
     const recentIncidents = recentDets.map((d) => ({
       id: d.id,
       title: d.objectDetected || 'Detection',
+      confidence: typeof d.confidence === 'number' ? d.confidence : 75.0,
       severity:
         d.confidence >= 90 ? 'critical' : d.confidence >= 75 ? 'warning' : 'routine',
       camera: d.cameraSource || '—',
       time: new Date(d.timestamp).toLocaleString(undefined, { hour12: false }),
-      image: d.snapshot || null,
+      image: d.snapshotPath || d.enhancedImage || d.snapshot || null,
+      distance_m: d.distance_m || null,
+      modelsUsed: d.modelsUsed || ['FUNIE-GAN', 'YOLOv8', 'MiDaS'],
+      status: d.status || 'investigating',
+      notes: d.reviewNotes || ''
     }));
 
     const camAgg = await Detection.aggregate([

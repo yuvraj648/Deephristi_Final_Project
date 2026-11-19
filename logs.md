@@ -535,3 +535,59 @@ All five local endpoints returned HTTP 200 during the verification on 2026-11-18
   3. **Verification:**
      - Tested `POST /pipeline` on active YouTube stream (`https://www.youtube.com/watch?v=jzx_n25g3kA`): successfully extracted live frame, ran FUNIE-GAN (PSNR 23.67 dB, SSIM 0.632, UIQM 0.851), MiDaS depth estimation (`OPERATIONAL`, avg 11.0m), and YOLOv8 on RTX 3050 CUDA.
      - Tested `POST /render-video` on active YouTube stream: extracted and processed 150 frames in 14.9 seconds on CUDA (248 detections), outputted clean H.264 MP4 file.
+
+## 25. 2026-11-19 — Detections review actions & status workflow, Reports & ReportsDetail telemetry wiring, and Active Learning strategy
+
+### 1. Backend Service Reload for YouTube Live Inference
+- Restarted backend Express process (Process ID 25624 -> background task) to load the updated `detectionService.js` without the legacy `simulateDetection` bypass.
+- Feeds (including YouTube URLs) now forward directly to Flask GPU `/pipeline` for live YOLO + FUNIE-GAN + MiDaS inference.
+
+### 2. Detections Page Investigation Workflow & Interactive Buttons Fixed
+- **Root Cause:** In `SURVEILLANCE/DeepDrishti/frontend/src/components/DetectionPreview.jsx`, the action buttons (`False Positive`, `Confirm`, `Add Note`, `Generate Report`) were static dummy HTML tags without any `onClick` event listeners or API integration.
+- **Fixes Applied:**
+  - **False Positive Button:** Connected to `PATCH /api/v1/detections/:id/false-positive`. Updates status to `false_positive` (badge: `FALSE POSITIVE`), persists reviewer details (`Captain Atha`) and audit timestamp, and updates parent detection list in real time.
+  - **Confirm Threat Button:** Connected to `PATCH /api/v1/detections/:id/confirm`. Updates status to `confirmed` (badge: `CONFIRMED`), logs to operations, and updates table badge.
+  - **Re-Open Investigation:** Added a `Re-open` button when a detection has been reviewed, allowing operators to reset status back to `investigating` (`PUT /api/v1/detections/:id` with `{ status: 'investigating' }`).
+  - **Add Note Drawer:** Added interactive inline drawer allowing operators to type custom observation notes (e.g. "Sonar verified training mine") and save directly to MongoDB (`reviewNotes`). Displays notes on the detection card.
+  - **Generate Report Button:** Connected to `navigate('/reports/detail')`, seamlessly passing live detection telemetry to the Reports Console.
+  - Passed `onUpdateDetection` callback from `DetectionRecords.jsx` to update row state immediately without waiting for background polling.
+
+### 3. Reports & Reports Detail Pages Fixed
+- **Root Cause of Pitch-Black Recent Evidence Cards in Reports:**
+  - `reportController.js` was returning `image: d.snapshot || null`. When detections were logged without raw snapshots, this resolved to `null`.
+  - In `Reports.jsx`, `PLACEHOLDER_IMG` was a pitch-black box (`#0f172a`), giving the appearance of broken video blocks.
+  - When snapshots existed at `/outputs/...`, the frontend attempted to resolve against Vite port 5175 rather than Flask port 5001.
+- **Fixes Applied:**
+  - In `reportController.js`, updated `recentIncidents` mapping to inspect `d.snapshotPath || d.enhancedImage || d.snapshot || null`, and included `confidence`, `distance_m`, `modelsUsed`, `status`, and `notes`.
+  - In `Reports.jsx`, added `resolveImageUrl` pointing to Flask origin (`localhost:5001`) and designed a tactical cyan sonar telemetry SVG placeholder for live stream frames without saved files.
+  - In `ReportsDetail.jsx`:
+    - Replaced hardcoded dummy text (`UNIDENTIFIED_V`, `88.52%`, `MAR_SUR_V4.2`) with real data from `incidentData` (`objectDetected`, `confidence`, `camera`, `status`, `distance_m`, `modelsUsed`).
+    - Connected Operator Console buttons (`False Positive`, `Confirmed Threat`, `Escalate Priority`, `Assign to Team`) to update MongoDB via API.
+    - Connected Observation Notes save button and blur handler to persist findings to `Detection.reviewNotes`.
+- **Lint & Build Validation:**
+  - `ReportsDetail.jsx`, `DetectionRecords.jsx`, and `DetectionPreview.jsx` passed ESLint with **0 errors, 0 warnings**.
+  - Production build (`npx vite build`): **Pass in 4.54s**.
+
+### 4. Human-in-the-Loop (HITL) Active Learning Strategy for YOLO Accuracy
+- Documented actionable strategy for utilizing operator-marked `False Positive` and `Confirm Threat` samples to continually fine-tune and specialize `best.pt` to specific seabed conditions.
+
+## 26. 2026-11-19 — Master Launcher (RUN_ALL_MODULES.bat) Virtualenv path fix & package installation
+
+### 1. Root Cause of `ModuleNotFoundError: No module named 'imageio_ffmpeg'`
+- When executing `RUN_ALL_MODULES.bat`, it invokes `SURVEILLANCE\DeepDrishti\run_all.bat`.
+- In `run_all.bat`, line 9 was checking:
+  `if exist "%~dp0model\venv\Scripts\python.exe"` (missing leading dot).
+- Because the actual virtual environment directory created in `model` is `.venv` (with a dot), the check evaluated to `false`.
+- The script fell back to the `else` branch: `start cmd /k "cd /d %~dp0model && python app.py"`, invoking the system-wide global Python interpreter (`Python 3.11`), which lacked `imageio-ffmpeg` (and CUDA PyTorch).
+
+### 2. Fixes Applied
+1. **Updated [run_all.bat](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/run_all.bat#L9-L15):**
+   - Added check for `%~dp0model\.venv\Scripts\python.exe` first.
+   - Ensures the dedicated CUDA virtual environment with RTX 3050 PyTorch 2.5.1+cu121 is automatically selected when double-clicking `RUN_ALL_MODULES.bat` or `run_all.bat`.
+2. **Safe Import Fallback in [app.py](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/model/app.py#L5-L10):**
+   - Wrapped `import imageio_ffmpeg` in a `try...except ImportError` block so `app.py` never crashes on startup even if launched in an environment without `imageio-ffmpeg`.
+3. **Installed in Global Python:**
+   - Executed `python -m pip install imageio-ffmpeg` into the global Python 3.11 environment so both `.venv` and global Python are fully equipped.
+4. **Verification:**
+   - Verified `imageio_ffmpeg` (v0.8.1) loads successfully in global Python.
+   - Verified `model\.venv\Scripts\python.exe` launches with `torch.cuda.is_available() == True` on `NVIDIA GeForce RTX 3050 Laptop GPU`.

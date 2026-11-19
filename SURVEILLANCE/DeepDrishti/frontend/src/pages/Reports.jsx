@@ -16,10 +16,20 @@ const TIMEFRAME_LABEL = {
   '30d': 'Last 30 days',
 };
 
+const FLASK_STATIC_ORIGIN =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FLASK_URL) ||
+  'http://localhost:5001';
+
+const resolveImageUrl = (img) => {
+  if (!img) return null;
+  if (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('data:')) return img;
+  return `${FLASK_STATIC_ORIGIN}${img.startsWith('/') ? '' : '/'}${img}`;
+};
+
 const PLACEHOLDER_IMG =
   'data:image/svg+xml,' +
   encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240" fill="%230f172a"><rect width="100%" height="100%"/><text x="50%" y="50%" fill="%2364748b" font-size="13" font-family="system-ui,sans-serif" text-anchor="middle" dy=".35em">No snapshot</text></svg>'
+    '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240" fill="#08101e"><rect width="100%" height="100%"/><circle cx="200" cy="120" r="50" stroke="#00d4ff" stroke-width="1.5" stroke-dasharray="4 4" fill="none" opacity="0.4"/><line x1="200" y1="50" x2="200" y2="190" stroke="#00d4ff" stroke-width="1" opacity="0.3"/><line x1="130" y1="120" x2="270" y2="120" stroke="#00d4ff" stroke-width="1" opacity="0.3"/><text x="50%" y="48%" fill="#00d4ff" font-size="11" font-family="monospace" text-anchor="middle" font-weight="bold">TACTICAL TELEMETRY</text><text x="50%" y="62%" fill="#64748b" font-size="9" font-family="monospace" text-anchor="middle">LIVE STREAM LOGGED</text></svg>'
   );
 
 const Reports = () => {
@@ -334,7 +344,7 @@ const Reports = () => {
                 >
                   <div className="relative overflow-hidden rounded border border-border-muted transition-colors hover:border-primary">
                     <img
-                      src={incident.image || PLACEHOLDER_IMG}
+                      src={resolveImageUrl(incident.image) || PLACEHOLDER_IMG}
                       alt=""
                       className="h-24 w-full object-cover transition-transform group-hover:scale-105"
                     />

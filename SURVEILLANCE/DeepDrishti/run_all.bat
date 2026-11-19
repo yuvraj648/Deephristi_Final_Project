@@ -6,7 +6,9 @@ echo ========================================================
 echo.
 
 echo [1/3] Starting Python AI Model Microservice (Port 5001)...
-if exist "%~dp0model\venv\Scripts\python.exe" (
+if exist "%~dp0model\.venv\Scripts\python.exe" (
+    start "DeepDrishti - AI Model (Port 5001)" cmd /k "cd /d %~dp0model && .\.venv\Scripts\python.exe app.py"
+) else if exist "%~dp0model\venv\Scripts\python.exe" (
     start "DeepDrishti - AI Model (Port 5001)" cmd /k "cd /d %~dp0model && .\venv\Scripts\python.exe app.py"
 ) else (
     start "DeepDrishti - AI Model (Port 5001)" cmd /k "cd /d %~dp0model && python app.py"

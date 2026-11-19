@@ -3,7 +3,10 @@ import sys
 import time
 import uuid
 import subprocess
-import imageio_ffmpeg
+try:
+    import imageio_ffmpeg
+except ImportError:
+    imageio_ffmpeg = None
 
 # Reconfigure stdout and stderr for UTF-8 to prevent charmap crashes on Windows
 try:
