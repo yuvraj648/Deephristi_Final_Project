@@ -457,9 +457,31 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
               <span className="text-emerald-400 font-semibold">21 Stations</span>
             </div>
             {activeKpiInfo === 'total' && (
-              <div className="p-2.5 bg-[#030a13] border border-sky-500/40 rounded text-[11px] text-neutral-300 space-y-1 font-sans">
-                <p className="font-semibold text-white">Tri-Model Ensemble Consensus:</p>
-                <p>Synthesizes predictions across DeepDrishti 18S CNN, EX2203 COI XGBoost, and Tara Oceans DNABERT-2 for 100% complete 7-level Linnaean lineage coverage.</p>
+              <div className="p-3 bg-[#030a13] border border-sky-500/50 rounded text-[11px] text-neutral-300 space-y-1.5 font-sans animate-fadeIn">
+                <div className="flex items-center justify-between border-b border-white/10 pb-1">
+                  <span className="font-semibold text-white font-mono text-[10.5px] uppercase text-sky-400">
+                    ⓘ Tri-Model Consensus
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveKpiInfo(null)}
+                    className="text-neutral-400 hover:text-white text-[10px]"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div>
+                  <strong className="text-sky-300 font-mono text-[9.5px] uppercase block">What It Means:</strong>
+                  <p className="text-neutral-200 text-[10.5px]">Multi-model consensus combining all three AI classifiers for 100% complete 7-level taxonomy.</p>
+                </div>
+                <div>
+                  <strong className="text-emerald-400 font-mono text-[9.5px] uppercase block">How It Works:</strong>
+                  <p className="text-neutral-200 text-[10.5px]">Merges predictions from our 1D-CNN (algae), XGBoost (animals), and DNABERT-2 (microbes) through a Bayesian voting layer.</p>
+                </div>
+                <div>
+                  <strong className="text-amber-300 font-mono text-[9.5px] uppercase block">Why It Matters:</strong>
+                  <p className="text-neutral-300 text-[10px]">No single model can classify every ocean organism. An ensemble ensures zero blind spots across all forms of marine life.</p>
+                </div>
               </div>
             )}
           </div>
@@ -492,9 +514,31 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
               <span className="text-sky-400 font-bold">{cnnPct}% share</span>
             </div>
             {activeKpiInfo === 'cnn' && (
-              <div className="p-2.5 bg-[#030a13] border border-sky-500/40 rounded text-[11px] text-neutral-300 space-y-1 font-sans">
-                <p className="font-semibold text-white">DeepDrishti 18S-V9 CNN:</p>
-                <p>Specialized in micro-algal and protist amplicons. Key phyla detected: <em>Chlorophyta, Dinoflagellata, Ciliophora, Cercozoa</em>.</p>
+              <div className="p-3 bg-[#030a13] border border-sky-500/50 rounded text-[11px] text-neutral-300 space-y-1.5 font-sans animate-fadeIn">
+                <div className="flex items-center justify-between border-b border-white/10 pb-1">
+                  <span className="font-semibold text-white font-mono text-[10.5px] uppercase text-sky-400">
+                    ⓘ DeepDrishti 18S-V9 CNN
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveKpiInfo(null)}
+                    className="text-neutral-400 hover:text-white text-[10px]"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div>
+                  <strong className="text-sky-300 font-mono text-[9.5px] uppercase block">What It Means:</strong>
+                  <p className="text-neutral-200 text-[10.5px]">A specialized 1D Convolutional Neural Network tuned to 143-basepair 18S ribosomal RNA barcodes.</p>
+                </div>
+                <div>
+                  <strong className="text-emerald-400 font-mono text-[9.5px] uppercase block">How It Works:</strong>
+                  <p className="text-neutral-200 text-[10.5px]">Slides numerical scanning filters over the DNA letters to spot conserved hairpin loops and diagnostic micro-algal patterns.</p>
+                </div>
+                <div>
+                  <strong className="text-amber-300 font-mono text-[9.5px] uppercase block">Key Organisms Detected:</strong>
+                  <p className="text-neutral-300 text-[10px]">Green micro-algae (<em>Chlorophyta</em>), dinoflagellates (<em>Dinoflagellata</em>), and ciliates (<em>Ciliophora</em>).</p>
+                </div>
               </div>
             )}
           </div>
@@ -527,9 +571,31 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
               <span className="text-emerald-400 font-bold">{xgbPct}% share</span>
             </div>
             {activeKpiInfo === 'xgb' && (
-              <div className="p-2.5 bg-[#030a13] border border-emerald-500/40 rounded text-[11px] text-neutral-300 space-y-1 font-sans">
-                <p className="font-semibold text-white">EX2203 COI XGBoost:</p>
-                <p>Optimized for mitochondrial barcodes from abyssal fauna. Key phyla detected: <em>Arthropoda, Mollusca, Annelida, Echinodermata</em>.</p>
+              <div className="p-3 bg-[#030a13] border border-emerald-500/50 rounded text-[11px] text-neutral-300 space-y-1.5 font-sans animate-fadeIn">
+                <div className="flex items-center justify-between border-b border-white/10 pb-1">
+                  <span className="font-semibold text-white font-mono text-[10.5px] uppercase text-emerald-400">
+                    ⓘ EX2203 Deep-Sea COI XGBoost
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveKpiInfo(null)}
+                    className="text-neutral-400 hover:text-white text-[10px]"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div>
+                  <strong className="text-emerald-300 font-mono text-[9.5px] uppercase block">What It Means:</strong>
+                  <p className="text-neutral-200 text-[10.5px]">A Gradient-Boosted Decision Tree model trained on deep-ocean mitochondrial DNA (COI).</p>
+                </div>
+                <div>
+                  <strong className="text-emerald-400 font-mono text-[9.5px] uppercase block">How It Works:</strong>
+                  <p className="text-neutral-200 text-[10.5px]">Counts 64 tri-nucleotide frequency patterns (AAA, AAC...) and uses an ensemble of 300 decision trees to vote on animal taxonomy.</p>
+                </div>
+                <div>
+                  <strong className="text-amber-300 font-mono text-[9.5px] uppercase block">Key Organisms Detected:</strong>
+                  <p className="text-neutral-300 text-[10px]">Deep-sea crabs and copepods (<em>Arthropoda</em>), sea snails and squids (<em>Mollusca</em>), and marine worms (<em>Annelida</em>).</p>
+                </div>
               </div>
             )}
           </div>
@@ -562,9 +628,31 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
               <span className="text-purple-400 font-bold">{bertPct}% share</span>
             </div>
             {activeKpiInfo === 'bert' && (
-              <div className="p-2.5 bg-[#030a13] border border-purple-500/40 rounded text-[11px] text-neutral-300 space-y-1 font-sans">
-                <p className="font-semibold text-white">Tara Oceans DNABERT-2:</p>
-                <p>117M Transformer foundation model capturing complex genomic motifs. Key phyla detected: <em>Proteobacteria, Cyanobacteria, Ascomycota</em>.</p>
+              <div className="p-3 bg-[#030a13] border border-purple-500/50 rounded text-[11px] text-neutral-300 space-y-1.5 font-sans animate-fadeIn">
+                <div className="flex items-center justify-between border-b border-white/10 pb-1">
+                  <span className="font-semibold text-white font-mono text-[10.5px] uppercase text-purple-400">
+                    ⓘ Tara Oceans DNABERT-2 (117M)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveKpiInfo(null)}
+                    className="text-neutral-400 hover:text-white text-[10px]"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div>
+                  <strong className="text-purple-300 font-mono text-[9.5px] uppercase block">What It Means:</strong>
+                  <p className="text-neutral-200 text-[10.5px]">A 117-million parameter Foundation Transformer model trained on massive global ocean metagenomic datasets.</p>
+                </div>
+                <div>
+                  <strong className="text-emerald-400 font-mono text-[9.5px] uppercase block">How It Works:</strong>
+                  <p className="text-neutral-200 text-[10.5px]">Uses multi-head self-attention to understand complex genetic syntax and long-range nucleotide relationships.</p>
+                </div>
+                <div>
+                  <strong className="text-amber-300 font-mono text-[9.5px] uppercase block">Key Organisms Detected:</strong>
+                  <p className="text-neutral-300 text-[10px]">Universal marine bacteria (<em>Proteobacteria</em>), oxygen-producing cyanobacteria (<em>Cyanobacteria</em>), and marine fungi.</p>
+                </div>
               </div>
             )}
           </div>

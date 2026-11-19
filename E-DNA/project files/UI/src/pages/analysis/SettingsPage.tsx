@@ -123,10 +123,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout }) => {
         <Plate eyebrow="BIOINFORMATICS ENGINES" title="Reference Database Configuration">
           <div className="space-y-4 font-mono text-[13px]">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-[11px] uppercase tracking-wider text-ink-faint mb-1">
-                  Reference Taxonomy Library
-                </label>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] uppercase tracking-wider text-ink-faint">
+                    Reference Taxonomy Library
+                  </label>
+                  <span
+                    className="text-[11px] text-sky-400 cursor-help"
+                    title="The authoritative reference gene bank used to match amplicon DNA barcodes against verified specimens."
+                  >
+                    ⓘ
+                  </span>
+                </div>
                 <select
                   value={refDatabase}
                   onChange={(e) => setRefDatabase(e.target.value)}
@@ -136,12 +144,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout }) => {
                   <option value="ncbi_genbank_marine">NCBI GenBank Marine Metazoa v2026</option>
                   <option value="boldsystems_v4">BOLD Systems COI Barcode Library</option>
                 </select>
+                <p className="text-[10px] text-ink-muted font-sans leading-tight">
+                  SILVA is optimal for plankton and micro-algae; NCBI/BOLD specialize in marine animals and fishes.
+                </p>
               </div>
 
-              <div>
-                <label className="block text-[11px] uppercase tracking-wider text-ink-faint mb-1">
-                  Bootstrap Cutoff Threshold (%)
-                </label>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] uppercase tracking-wider text-ink-faint">
+                    Bootstrap Cutoff Threshold (%)
+                  </label>
+                  <span
+                    className="text-[11px] text-sky-400 cursor-help"
+                    title="Minimum statistical probability required to confirm a classification rank (standard: 80%). Lowering allows more guesses; raising prevents false positives."
+                  >
+                    ⓘ
+                  </span>
+                </div>
                 <input
                   type="number"
                   min="50"
@@ -150,12 +169,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout }) => {
                   onChange={(e) => setBootstrapCutoff(e.target.value)}
                   className="w-full bg-paper border border-rule rounded-control px-3 py-1.5 text-ink focus:outline-none focus:border-survey text-[12px]"
                 />
+                <p className="text-[10px] text-ink-muted font-sans leading-tight">
+                  Standard cutoff is 80%. Sequences with lower confidence are marked 'unassigned' rather than guessed.
+                </p>
               </div>
 
-              <div>
-                <label className="block text-[11px] uppercase tracking-wider text-ink-faint mb-1">
-                  Novelty Divergence Threshold (%)
-                </label>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] uppercase tracking-wider text-ink-faint">
+                    Novelty Divergence Threshold (%)
+                  </label>
+                  <span
+                    className="text-[11px] text-sky-400 cursor-help"
+                    title="Minimum genetic distance from published references to flag an organism as a candidate divergent lineage (standard: 12%)."
+                  >
+                    ⓘ
+                  </span>
+                </div>
                 <input
                   type="number"
                   min="5"
@@ -164,6 +194,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onLogout }) => {
                   onChange={(e) => setDivergenceThreshold(e.target.value)}
                   className="w-full bg-paper border border-rule rounded-control px-3 py-1.5 text-ink focus:outline-none focus:border-survey text-[12px]"
                 />
+                <p className="text-[10px] text-ink-muted font-sans leading-tight">
+                  Variants with &gt;12% divergence from known reference barcodes are sent to the Novelty Explorer.
+                </p>
               </div>
             </div>
           </div>
