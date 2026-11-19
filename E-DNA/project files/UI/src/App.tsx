@@ -195,7 +195,7 @@ const MainAppContent: React.FC = () => {
           setLocalProfile(null);
           setScreen('landing');
         }}
-        onOpenSurveillance={() => setScreen('surveillance')}
+        onOpenSurveillance={navigateToSurveillance}
         onOpenCommunity={() => setScreen('community')}
         researcherName={researcherProfile?.full_name || researcherUser}
         researcherProfile={researcherProfile}
