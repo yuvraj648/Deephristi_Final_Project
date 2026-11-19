@@ -1,0 +1,19 @@
+# 1. Stage all your changed / new files
+git add .
+
+# 2. Commit with a message describing what you changed
+git commit -m "feat: description of your changes here"
+
+# 3. Push to your branch on GitHub
+git push origin yuvraj
+
+git checkout yuvraj
+git checkout main
+git pull origin main 
+
+
+current changes
+git checkout main
+git pull origin main
+git merge yuvraj
+git push origin main

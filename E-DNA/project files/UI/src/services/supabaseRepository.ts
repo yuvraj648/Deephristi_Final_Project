@@ -18,6 +18,7 @@ import type {
   ExpeditionSummaryItem,
   BatchProgressCallback,
 } from './repositoryTypes';
+import { ensureUUID } from '../lib/uuid';
 
 const BATCH_SIZE_SAMPLES = 500;
 const BATCH_SIZE_ASVS = 500;
@@ -35,7 +36,8 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
     rows: T[],
     batchSize: number,
     stageName: string,
-    onProgress?: BatchProgressCallback
+    onProgress?: BatchProgressCallback,
+    conflictColumn?: string
   ): Promise<void> {
     const total = rows.length;
     if (total === 0) return;
@@ -46,7 +48,13 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
 
     for (let i = 0; i < total; i += batchSize) {
       const batch = rows.slice(i, i + batchSize);
-      const { error } = await supabase.from(table).upsert(batch as any);
+
+      let query = supabase.from(table).upsert(batch as any, {
+        onConflict: conflictColumn || 'id',
+        ignoreDuplicates: false,
+      });
+
+      const { error } = await query;
 
       if (error) {
         throw new Error(
@@ -59,6 +67,18 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
         onProgress(stageName, completed, total);
       }
     }
+  }
+
+  /**
+   * Delete all child records for a given expedition before re-inserting.
+   * This ensures a clean "overwrite" when re-saving the same expedition.
+   */
+  private async deleteExpeditionChildren(expeditionId: string): Promise<void> {
+    if (!supabase) return;
+    // Order matters: occurrences first (depends on asvs + samples), then asvs/samples
+    await supabase.from('occurrences').delete().eq('expedition_id', expeditionId);
+    await supabase.from('asvs').delete().eq('expedition_id', expeditionId);
+    await supabase.from('samples').delete().eq('expedition_id', expeditionId);
   }
 
   /**
@@ -101,14 +121,15 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
   }
 
   async listExpeditions(): Promise<ExpeditionSummaryItem[]> {
-    const items: ExpeditionSummaryItem[] = [];
+    const uploadedItems: ExpeditionSummaryItem[] = [];
 
-    // 1. Fetch remote uploaded expeditions from Supabase
+    // 1. Fetch remote uploaded expeditions from Supabase (RLS ensures only this user's own)
     if (supabase) {
       try {
         const { data, error } = await supabase
           .from('expeditions')
           .select('id, name, region, provenance, updated_at, created_at')
+          .eq('provenance', 'uploaded')
           .order('created_at', { ascending: false });
 
         if (error) {
@@ -126,7 +147,7 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
               .select('*', { count: 'exact', head: true })
               .eq('expedition_id', exp.id);
 
-            items.push({
+            uploadedItems.push({
               id: exp.id,
               name: exp.name,
               region: exp.region,
@@ -143,21 +164,23 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
       }
     }
 
-    // 2. Append local demo reference expeditions
+    // 2. Build demo items from local demoStore (always visible to everyone, never stored in cloud)
+    const demoItems: ExpeditionSummaryItem[] = [];
     demoStore.forEach((exp) => {
-      items.push({
+      demoItems.push({
         id: exp.id,
         name: exp.name,
         region: exp.region,
         samples: exp.samples.length,
         asvs: exp.asvs.length,
-        status: 'Local Reference',
+        status: 'Standard Demo',
         provenance: 'demo',
         updated: exp.updated,
       });
     });
 
-    return items;
+    // Demos first, then user's own uploaded expeditions
+    return [...demoItems, ...uploadedItems];
   }
 
   async getExpedition(id: string): Promise<Expedition | null> {
@@ -266,31 +289,43 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
 
     if (onProgress) onProgress('Preparing dataset', 0, 1);
 
+    // Ensure expedition.id conforms to Supabase PostgreSQL UUID format
+    const validExpId = ensureUUID(expedition.id);
+    expedition.id = validExpId;
+
     // Get current authenticated user if logged in
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    // Stage 1: Insert Expedition Header
+    // Stage 1: Upsert Expedition Header (safe on duplicate id)
     if (onProgress) onProgress('Uploading expedition', 0, 1);
-    const { error: expError } = await supabase.from('expeditions').upsert({
-      id: expedition.id,
-      researcher_id: user?.id || null,
-      name: expedition.name,
-      region: expedition.region,
-      description: expedition.description,
-      provenance: 'uploaded',
-      updated_at: new Date().toISOString(),
-    });
+    const { error: expError } = await supabase.from('expeditions').upsert(
+      {
+        id: validExpId,
+        researcher_id: user?.id || null,
+        name: expedition.name,
+        region: expedition.region,
+        description: expedition.description,
+        provenance: 'uploaded',
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' }
+    );
 
     if (expError) {
       throw new Error(`Failed to upload expedition header to Supabase: ${expError.message}`);
     }
     if (onProgress) onProgress('Uploading expedition', 1, 1);
 
+    // Stage 1b: Delete old child records so we can re-insert cleanly (handles retries and re-uploads)
+    if (onProgress) onProgress('Clearing previous records', 0, 1);
+    await this.deleteExpeditionChildren(validExpId);
+    if (onProgress) onProgress('Clearing previous records', 1, 1);
+
     // Stage 2: Batch Insert Samples
     const sampleRows = expedition.samples.map((s) => ({
-      expedition_id: expedition.id,
+      expedition_id: validExpId,
       sample_id: s.sample_id,
       site: s.site,
       latitude: s.latitude !== undefined ? s.latitude : null,
@@ -305,12 +340,13 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
       sampleRows,
       BATCH_SIZE_SAMPLES,
       'Uploading samples',
-      onProgress
+      onProgress,
+      'expedition_id,sample_id'
     );
 
     // Stage 3: Batch Insert ASVs
     const asvRows = expedition.asvs.map((a) => ({
-      expedition_id: expedition.id,
+      expedition_id: validExpId,
       asv_id: a.asv_id,
       sequence: a.sequence,
       sequence_length: a.sequence.length,
@@ -330,12 +366,13 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
       asvRows,
       BATCH_SIZE_ASVS,
       'Uploading ASVs',
-      onProgress
+      onProgress,
+      'expedition_id,asv_id'
     );
 
     // Stage 4: Batch Insert Occurrences
     const occurrenceRows = expedition.occurrences.map((o) => ({
-      expedition_id: expedition.id,
+      expedition_id: validExpId,
       asv_id: o.asv_id,
       sample_id: o.sample_id,
       abundance: o.abundance,
@@ -346,7 +383,8 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
       occurrenceRows,
       BATCH_SIZE_OCCURRENCES,
       'Uploading abundance records',
-      onProgress
+      onProgress,
+      'expedition_id,asv_id,sample_id'
     );
 
     if (onProgress) onProgress('Finalizing', 1, 1);
@@ -374,6 +412,11 @@ export class SupabaseExpeditionRepository implements IExpeditionRepository {
 
     // Also remove from local cache
     removeUploadedExpedition(id);
+
+    // Fire-and-forget delete to local backend if running
+    fetch(`http://localhost:8000/expeditions/${id}`, {
+      method: 'DELETE',
+    }).catch(() => {});
 
     if (getPersistedActiveExpeditionId() === id) {
       const firstDemo = Array.from(demoStore.values())[0];

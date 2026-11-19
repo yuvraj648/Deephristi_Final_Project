@@ -1,4 +1,6 @@
 import os
+import io
+import gzip
 import json
 import pickle
 import sqlite3
@@ -7,10 +9,10 @@ import numpy as np
 import socket
 import subprocess
 from contextlib import contextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Tuple
 
 app = FastAPI()
 
@@ -124,6 +126,26 @@ def predict_all_models(request: PredictRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Comparative inference error: {str(e)}")
 
+class BatchPredictRequest(BaseModel):
+    sequences: List[str]
+    model_id: Optional[str] = "deepdrishti_cnn"
+
+BatchPredictRequest.model_rebuild()
+
+@app.post("/predict/batch")
+def predict_batch_sequences(request: BatchPredictRequest):
+    """Batch classify raw DNA sequences into 7-level taxonomy hierarchy."""
+    if not MODELS_LOADED:
+        raise HTTPException(status_code=503, detail="No ML models are loaded.")
+    if not request.sequences:
+        return []
+    try:
+        return manager.predict_batch(request.sequences, request.model_id)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Batch inference error: {str(e)}")
+
 # ============================================================
 # API ENDPOINTS — Expedition CRUD (SQLite-backed)
 # ============================================================
@@ -214,6 +236,16 @@ def compute_expedition_embeddings(exp_id: str):
         if row_sum > 0:
             X[i] /= row_sum
 
+    if len(asvs) < 2:
+        for a in asvs:
+            a["embedding"] = [0.0, 0.0]
+        exp["asvs"] = asvs
+        serialized = json.dumps(exp, ensure_ascii=False)
+        conn.execute("UPDATE expeditions SET data = ? WHERE id = ?", (serialized, exp_id))
+        conn.commit()
+        conn.close()
+        return {"status": "success", "count": len(asvs), "expedition": exp}
+
     pca = PCA(n_components=2, random_state=42)
     coords = pca.fit_transform(X)
 
@@ -242,6 +274,177 @@ def delete_expedition(exp_id: str):
     conn.commit()
     conn.close()
     return {"status": "success"}
+
+# ============================================================
+# FASTQ PROCESSING — Parse, Quality-Filter, Cluster → ASV Table
+# ============================================================
+
+def parse_fastq_bytes(raw_bytes: bytes) -> List[Tuple[str, str]]:
+    """
+    Parse a FASTQ or FASTQ.gz byte stream into (sequence, quality) tuples.
+    Handles both plain .fastq and .fastq.gz compressed formats.
+    """
+    try:
+        # Try to decompress as gzip first
+        with gzip.open(io.BytesIO(raw_bytes), 'rt', encoding='utf-8', errors='replace') as f:
+            text = f.read()
+    except Exception:
+        # Fall back to plain text
+        text = raw_bytes.decode('utf-8', errors='replace')
+
+    reads: List[Tuple[str, str]] = []
+    lines = text.splitlines()
+    i = 0
+    while i + 3 < len(lines):
+        header = lines[i].strip()
+        seq    = lines[i + 1].strip()
+        sep    = lines[i + 2].strip()
+        qual   = lines[i + 3].strip()
+        if header.startswith('@') and sep.startswith('+') and seq and qual:
+            reads.append((seq.upper(), qual))
+        i += 4
+
+    return reads
+
+
+def filter_reads(reads: List[Tuple[str, str]]) -> List[str]:
+    """
+    Quality-filter reads:
+      - Minimum average Phred Q-score ≥ 20
+      - Length 100 – 600 bp
+      - Ambiguous base fraction ≤ 1%
+    Returns clean sequences only (no quality string needed downstream).
+    """
+    MIN_LEN = 100
+    MAX_LEN = 600
+    MIN_Q   = 20.0
+    MAX_N_FRAC = 0.01
+
+    good: List[str] = []
+    for seq, qual in reads:
+        if not (MIN_LEN <= len(seq) <= MAX_LEN):
+            continue
+        # Phred Q-score from ASCII (Phred+33 encoding)
+        if qual:
+            avg_q = sum(ord(c) - 33 for c in qual) / len(qual)
+            if avg_q < MIN_Q:
+                continue
+        n_frac = seq.count('N') / max(len(seq), 1)
+        if n_frac > MAX_N_FRAC:
+            continue
+        good.append(seq)
+    return good
+
+
+def cluster_to_asvs(seqs: List[str]) -> Dict[str, int]:
+    """
+    Exact-sequence clustering: identical sequences → one ASV.
+    Returns {sequence: total_abundance}.
+    Keeps only sequences with ≥ 2 supporting reads (singleton removal).
+    """
+    counts: Dict[str, int] = {}
+    for s in seqs:
+        counts[s] = counts.get(s, 0) + 1
+    # Remove singletons (likely sequencing errors)
+    return {s: c for s, c in counts.items() if c >= 2}
+
+
+@app.post("/process/fastq")
+async def process_fastq(file: UploadFile = File(...)):
+    """
+    Accept a demultiplexed FASTQ or FASTQ.gz file, run quality-filtering and
+    exact-sequence clustering, and return an ASV table ready for taxonomy
+    classification via /predict/batch.
+
+    Response JSON:
+    {
+      "asvs":        [{"asv_id": "ASV_00001", "sequence": "...", "abundance": 1234}],
+      "samples":     [{"sample_id": "...", "site": "..."}],
+      "occurrences": [{"asv_id": "...", "sample_id": "...", "abundance": 1234}],
+      "stats": {"total_reads": N, "filtered_reads": M, "unique_asvs": K}
+    }
+    """
+    filename = file.filename or "uploaded.fastq"
+    raw = await file.read()
+
+    if len(raw) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    # 1. Parse FASTQ records
+    all_reads = parse_fastq_bytes(raw)
+    total_reads = len(all_reads)
+
+    if total_reads == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="No FASTQ records could be parsed. Ensure the file is a valid FASTQ or FASTQ.gz archive."
+        )
+
+    # 2. Quality filter
+    clean_seqs = filter_reads(all_reads)
+    filtered_reads = len(clean_seqs)
+
+    # 3. Cluster to ASVs (exact deduplication + singleton removal)
+    asv_map = cluster_to_asvs(clean_seqs)
+
+    if len(asv_map) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"No ASVs remained after quality filtering and singleton removal. "
+                f"Input had {total_reads} reads; {filtered_reads} passed QC but all were singletons. "
+                "Try uploading a larger FASTQ file with higher sequencing depth."
+            )
+        )
+
+    # 4. Build ASV table
+    # Derive sample ID from filename (strip .fastq.gz / .fq.gz / .fastq / .fq)
+    base = filename
+    for ext in ['.fastq.gz', '.fq.gz', '.fastq', '.fq', '.gz']:
+        if base.endswith(ext):
+            base = base[:-len(ext)]
+            break
+    sample_id = base.replace(' ', '_').replace('-', '_')
+    site_name = f"Station {sample_id}"
+
+    # Sort by abundance descending; retain top 2,000 biological variants
+    sorted_asvs = sorted(asv_map.items(), key=lambda x: -x[1])
+    MAX_VARIANTS = 2000
+    if len(sorted_asvs) > MAX_VARIANTS:
+        sorted_asvs = sorted_asvs[:MAX_VARIANTS]
+
+    asvs_out = []
+    occurrences_out = []
+    for rank, (seq, abund) in enumerate(sorted_asvs, start=1):
+        asv_id = f"ASV_{rank:05d}"
+        asvs_out.append({
+            "asv_id": asv_id,
+            "sequence": seq,
+            "abundance": abund,
+        })
+        occurrences_out.append({
+            "asv_id": asv_id,
+            "sample_id": sample_id,
+            "abundance": abund,
+        })
+
+    samples_out = [{
+        "sample_id": sample_id,
+        "site": site_name,
+    }]
+
+    return {
+        "asvs": asvs_out,
+        "samples": samples_out,
+        "occurrences": occurrences_out,
+        "stats": {
+            "total_reads": total_reads,
+            "filtered_reads": filtered_reads,
+            "unique_asvs": len(asvs_out),
+            "singleton_removed": filtered_reads - sum(asv_map.values()),
+        }
+    }
+
 
 # ============================================================
 # UNDERWATER SURVEILLANCE MODULE INTEGRATION

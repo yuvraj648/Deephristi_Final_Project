@@ -32,7 +32,12 @@ import { AsvDetailDrawer } from './components/drawers/AsvDetailDrawer';
 import { SiteDetailDrawer } from './components/drawers/SiteDetailDrawer';
 import { ClusterDetailDrawer } from './components/drawers/ClusterDetailDrawer';
 import type { Sample, ASV, Occurrence, Expedition } from './domain/types';
-import { createExpeditionFromUploads } from './services/dataService';
+import { createExpeditionFromUploads, setRepository } from './services/dataService';
+import {
+  getLocalProfile,
+  setLocalProfile,
+  type ResearcherProfile,
+} from './services/researcherProfileService';
 
 const HeroPage = React.lazy(() =>
   import('./pages/HeroPage').then(({ HeroPage: page }) => ({ default: page }))
@@ -59,8 +64,12 @@ const MainAppContent: React.FC = () => {
 
   const [screen, setScreen] = useState<AppScreen>('hero');
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('overview');
-  const [researcherUser, setResearcherUser] = useState<string>('Dr. M. S. Swaminathan Group');
   const [researcherAuthMode, setResearcherAuthMode] = useState<'cloud' | 'local'>('local');
+  const [researcherProfile, setResearcherProfile] = useState<ResearcherProfile | null>(() => getLocalProfile());
+  const [researcherUser, setResearcherUser] = useState<string>(() => {
+    const cached = getLocalProfile();
+    return cached?.full_name || cached?.display_name || cached?.email || 'Dr. M. S. Swaminathan Group';
+  });
 
   // Staged creation workflow state
   const [stagedExpeditionMeta, setStagedExpeditionMeta] = useState<{
@@ -79,6 +88,7 @@ const MainAppContent: React.FC = () => {
     occurrences: Occurrence[];
     samples: Sample[];
     abundanceSampleIds?: string[];
+    isFastqUpload?: boolean;
   } | null>(null);
 
   const [stagedExpeditionToSave, setStagedExpeditionToSave] = useState<Expedition | null>(null);
@@ -101,6 +111,7 @@ const MainAppContent: React.FC = () => {
       occurrences: bio.occurrences,
       samples: bio.samples,
       abundanceSampleIds: bio.abundanceSampleIds,
+      isFastqUpload: bio.isFastqUpload,
     });
     setScreen('data_config');
   };
@@ -156,8 +167,14 @@ const MainAppContent: React.FC = () => {
   if (screen === 'auth') {
     return (
       <ResearcherLogin
-        onLoginSuccess={(userId, mode) => {
-          if (userId) setResearcherUser(userId);
+        onLoginSuccess={(profile: any, mode: 'cloud' | 'local' = 'cloud') => {
+          setRepository(null); // Reset so next getRepository() picks up fresh Supabase repo for this user
+          if (profile && typeof profile === 'object') {
+            setResearcherProfile(profile);
+            setResearcherUser(profile.full_name || profile.display_name || profile.email || 'Dr. Field Researcher');
+          } else if (typeof profile === 'string') {
+            setResearcherUser(profile);
+          }
           setResearcherAuthMode(mode);
           setScreen('home');
         }}
@@ -172,10 +189,16 @@ const MainAppContent: React.FC = () => {
       <ResearcherHome
         onOpenExpedition={handleOpenExistingExpedition}
         onNewExpedition={handleStartNewExpedition}
-        onLogout={() => setScreen('landing')}
-        onOpenSurveillance={navigateToSurveillance}
+        onLogout={() => {
+          setRepository(null); // Reset repo so next login starts fresh
+          setResearcherProfile(null);
+          setLocalProfile(null);
+          setScreen('landing');
+        }}
+        onOpenSurveillance={() => setScreen('surveillance')}
         onOpenCommunity={() => setScreen('community')}
-        researcherName={researcherUser}
+        researcherName={researcherProfile?.full_name || researcherUser}
+        researcherProfile={researcherProfile}
       />
     );
   }
@@ -228,12 +251,13 @@ const MainAppContent: React.FC = () => {
   if (screen === 'processing') {
     return (
       <ProcessingPipeline
-        isAsvData={true}
+        isAsvData={!stagedBioData?.isFastqUpload}
         isDemoMode={!stagedExpeditionToSave && expedition.provenance === 'demo'}
         expeditionToSave={stagedExpeditionToSave}
-        onComplete={() => {
-          if (stagedExpeditionToSave) {
-            setExpedition(stagedExpeditionToSave);
+        onComplete={(savedExpedition) => {
+          const finalExp = savedExpedition || stagedExpeditionToSave;
+          if (finalExp) {
+            setExpedition(finalExp);
             setStagedExpeditionToSave(null);
           }
           handleProcessingComplete();

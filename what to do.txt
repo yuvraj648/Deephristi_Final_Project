@@ -1,0 +1,3 @@
+sign up page
+name,lab details like name and location from where to operate,email,pass
+as per user data every data shold be stored into database and fetch from it

@@ -1,7 +1,8 @@
 // ========================================================
 // DEEPDRISHTI LOCATION × TAXA HEATMAP
 // Signature ecological matrix: sequential ocean ramp,
-// hatched missing cells, measure switching, and hover values
+// hatched missing cells, measure switching, dynamic selection,
+// and high-contrast text (black font on bluish/light cells).
 // ========================================================
 
 import React, { useState } from 'react';
@@ -14,7 +15,7 @@ export const LocationTaxaHeatmap: React.FC<{
   captionNumber?: number;
   initialMeasure?: HeatmapMeasure;
 }> = ({ captionNumber = 2, initialMeasure = 'abundance' }) => {
-  const { getLocationTaxaMatrix, filters, setActiveDrawer, setSelectedSiteId } = useAnalysis();
+  const { getLocationTaxaMatrix, filters, setActiveDrawer, setSelectedSiteId, selectedSiteId } = useAnalysis();
   const [measure, setMeasure] = useState<HeatmapMeasure>(initialMeasure);
   const [hoveredCell, setHoveredCell] = useState<{
     site: string;
@@ -23,11 +24,11 @@ export const LocationTaxaHeatmap: React.FC<{
   } | null>(null);
 
   const { sites, taxa, matrix, maxVal } = React.useMemo(
-    () => getLocationTaxaMatrix(measure, 7),
+    () => getLocationTaxaMatrix(measure, 8),
     [getLocationTaxaMatrix, measure]
   );
 
-  // Ocean sequential ramp: 7 stops
+  // Ocean sequential ramp: 7 luminous stops
   const oceanRamp = [
     '#EAF1F0',
     '#C6DDE0',
@@ -75,7 +76,7 @@ export const LocationTaxaHeatmap: React.FC<{
       }
     >
       <div className="overflow-x-auto">
-        <div className="min-w-[620px]">
+        <div className="min-w-[640px]">
           {/* Header Row: Taxa Columns */}
           <div className="grid grid-cols-[180px_repeat(auto-fit,minmax(70px,1fr))] gap-[2px] mb-[2px]">
             <div className="p-2 text-[11px] font-mono uppercase tracking-wider text-ink-faint bg-paper-sunk/60 rounded-control flex items-center">
@@ -94,60 +95,80 @@ export const LocationTaxaHeatmap: React.FC<{
 
           {/* Matrix Rows: Sites */}
           <div className="space-y-[2px]">
-            {sites.map((site, rowIdx) => (
-              <div
-                key={site}
-                className="grid grid-cols-[180px_repeat(auto-fit,minmax(70px,1fr))] gap-[2px] items-stretch"
-              >
-                {/* Site Label */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedSiteId(site);
-                    setActiveDrawer({ type: 'site', id: site });
-                  }}
-                  className="px-2 py-2 text-left font-mono text-[12px] text-ink hover:text-survey hover:bg-paper-sunk/80 rounded-control bg-paper-sunk/40 truncate transition-colors flex items-center justify-between"
-                  title={`Inspect station ${site}`}
+            {sites.map((site, rowIdx) => {
+              const isSelected =
+                selectedSiteId === site ||
+                (selectedSiteId && site.startsWith(selectedSiteId)) ||
+                (selectedSiteId && selectedSiteId.startsWith(site));
+
+              return (
+                <div
+                  key={site}
+                  className={`grid grid-cols-[180px_repeat(auto-fit,minmax(70px,1fr))] gap-[2px] items-stretch p-0.5 rounded-control transition-all ${
+                    isSelected ? 'bg-sky-500/20 ring-1 ring-survey shadow-sm' : ''
+                  }`}
                 >
-                  <span className="truncate">{site.split(' - ')[0]}</span>
-                  <span className="text-[10px] text-ink-faint">→</span>
-                </button>
+                  {/* Site Label Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedSiteId(site);
+                      setActiveDrawer({ type: 'site', id: site });
+                    }}
+                    className={`px-2 py-2 text-left font-mono text-[12px] rounded-control truncate transition-colors flex items-center justify-between ${
+                      isSelected
+                        ? 'bg-survey text-white font-bold'
+                        : 'text-ink hover:text-survey hover:bg-paper-sunk/80 bg-paper-sunk/40'
+                    }`}
+                    title={`Inspect station ${site}`}
+                  >
+                    <span className="truncate">{site.split(' - ')[0]}</span>
+                    <span className="text-[10px] opacity-70">→</span>
+                  </button>
 
-                {/* Heatmap Cells */}
-                {taxa.map((taxon, colIdx) => {
-                  const val = matrix[rowIdx]?.[colIdx];
-                  const hasVal = val !== null && val !== undefined && val > 0;
-                  const bgColor = getCellColor(val);
-                  const isLight = val !== null && val > maxVal * 0.45;
+                  {/* Heatmap Cells */}
+                  {taxa.map((taxon, colIdx) => {
+                    const val = matrix[rowIdx]?.[colIdx];
+                    const hasVal = val !== null && val !== undefined && val > 0;
+                    const bgColor = getCellColor(val);
+                    const ratio = maxVal > 0 ? (val ?? 0) / maxVal : 0;
+                    // Text contrast: in all light & medium bluish cells, force bold black text for maximum readability!
+                    // Only on the deepest navy (>0.7 ratio) use crisp white text.
+                    const isDeepNavy = ratio >= 0.7;
 
-                  return (
-                    <div
-                      key={`${site}-${taxon}`}
-                      onMouseEnter={() => setHoveredCell({ site, taxon, value: val })}
-                      onMouseLeave={() => setHoveredCell(null)}
-                      className={`relative h-10 rounded-control flex items-center justify-center font-mono text-[11px] transition-all cursor-crosshair border border-rule/30 ${
-                        hasVal ? '' : 'hatch-diagonal bg-[#E5E2D6]/40'
-                      }`}
-                      style={{ backgroundColor: hasVal ? bgColor : undefined }}
-                    >
-                      {hasVal ? (
-                        <span
-                          className={`tabular-nums font-medium ${
-                            isLight ? 'text-white' : 'text-ink'
-                          }`}
-                        >
-                          {measure === 'normalized'
-                            ? `${val}%`
-                            : val.toLocaleString()}
-                        </span>
-                      ) : (
-                        <span className="text-ink-faint text-[9px] select-none">—</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
+                    return (
+                      <div
+                        key={`${site}-${taxon}`}
+                        onMouseEnter={() => setHoveredCell({ site, taxon, value: val })}
+                        onMouseLeave={() => setHoveredCell(null)}
+                        onClick={() => {
+                          setSelectedSiteId(site);
+                          setActiveDrawer({ type: 'site', id: site });
+                        }}
+                        className={`relative h-10 rounded-control flex items-center justify-center font-mono text-[11px] transition-all cursor-pointer border border-rule/30 ${
+                          hasVal ? '' : 'hatch-diagonal bg-[#E5E2D6]/40'
+                        } ${isSelected ? 'ring-1 ring-survey/50' : ''}`}
+                        style={{ backgroundColor: hasVal ? bgColor : undefined }}
+                      >
+                        {hasVal ? (
+                          <span
+                            className={`tabular-nums font-bold ${
+                              isDeepNavy ? 'text-white' : 'text-[#060B13]'
+                            }`}
+                          >
+                            {measure === 'normalized'
+                              ? `${val}%`
+                              : val.toLocaleString()}
+                          </span>
+                        ) : (
+                          <span className="text-ink-faint text-[9px] select-none">—</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
           </div>
 
           {/* Hover Details & Legend */}
@@ -170,7 +191,7 @@ export const LocationTaxaHeatmap: React.FC<{
                 </div>
               ) : (
                 <span className="text-ink-faint italic">
-                  Hover over cells to inspect exact quantified readings.
+                  Hover over cells to inspect exact quantified readings. Click any cell to select station.
                 </span>
               )}
             </div>
