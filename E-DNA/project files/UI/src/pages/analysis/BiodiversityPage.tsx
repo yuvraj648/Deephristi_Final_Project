@@ -9,6 +9,7 @@
 // ========================================================
 
 import React, { useState, useMemo } from 'react';
+import ReactDOM from 'react-dom';
 import { useAnalysis } from '../../context/AnalysisContext';
 import { Plate } from '../../components/common/Plate';
 import { KPICard } from '../../components/common/KPICard';
@@ -617,9 +618,9 @@ export const BiodiversityPage: React.FC = () => {
           ECOLOGICAL DIVERSITY GUIDE MODAL (α, β, γ EXPLAINED)
           (z-[99999] prevents any map overlap or bleed-through)
           ======================================================== */}
-      {showGuideModal && (
+      {showGuideModal && ReactDOM.createPortal(
         <div
-          className="fixed inset-0 z-[99999] bg-black/90 backdrop-blur-md flex justify-center items-start overflow-y-auto p-4 pt-16 sm:pt-20 pb-12"
+          className="fixed inset-0 z-[99999] bg-black/90 backdrop-blur-md flex justify-center items-start overflow-y-auto p-6 pt-24 pb-12"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowGuideModal(false);
           }}
@@ -767,7 +768,8 @@ export const BiodiversityPage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

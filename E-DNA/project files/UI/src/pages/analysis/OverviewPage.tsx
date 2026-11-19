@@ -9,6 +9,7 @@
 // ========================================================
 
 import React, { useState, useMemo } from 'react';
+import ReactDOM from 'react-dom';
 import { useAnalysis } from '../../context/AnalysisContext';
 import { KPICard } from '../../components/common/KPICard';
 import { HydrographicMap } from '../../components/visualization/HydrographicMap';
@@ -936,9 +937,9 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
           5. HUMAN-UNDERSTANDABLE FORMULA & ALGORITHM FLOW MODAL
           (z-[99999] prevents any map overlap or bleed-through)
           ======================================================== */}
-      {selectedModelDetail && (
+      {selectedModelDetail && ReactDOM.createPortal(
         <div
-          className="fixed inset-0 z-[99999] bg-black/90 backdrop-blur-md flex justify-center items-start overflow-y-auto p-4 pt-16 sm:pt-20 pb-12"
+          className="fixed inset-0 z-[99999] bg-black/90 backdrop-blur-md flex justify-center items-start overflow-y-auto p-6 pt-24 pb-12"
           onClick={(e) => {
             if (e.target === e.currentTarget) setSelectedModelDetail(null);
           }}
@@ -1085,7 +1086,8 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
