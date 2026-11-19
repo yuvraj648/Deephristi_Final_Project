@@ -1304,8 +1304,32 @@ const AsvFileClassifySection: React.FC = () => {
               className="hidden"
             />
             <button
+              type="button"
+              onClick={() => {
+                const csvContent = `ASV_ID,Sequence,Sample_ID,Reads,Latitude,Longitude,Depth_m
+ASV_00001,GCTACTACCGATTGAACATTTTAGTGAGGTCCTCGGACTGTGAGCCAGGCGGGTCGCCCTGCCTGGTCTACGGGAAGACGACCAAACTGTAGTGTTTAGAGGAAGTAAAAGTCGTAACAAGGTTTCC,Station_01_12m,14825,15.1240,68.8520,12
+ASV_00002,TACTACCGATTGAATGTTTTAGTGAGGCCTTCGGACTGCGACCGGGCGGGTCGCCCGGCTTGGTCTACGGGAAGACGACCAAACTGTAGTGTTTAGAGGAAGTAAAAGTCGTAACAAGGTTTCC,Station_01_12m,9540,15.1240,68.8520,12
+ASV_00003,GCTACTACCGATTGAATATTTTAGTGAGGTCCTCGGACTGTGAGCCAGGCGGGTCGCCCTGCCTGGTCTACGGGAAGACGACCAAACTGTAGTGTTTAGAGGAAGTAAAAGTCGTAACAAGGTTTCC,Station_01_50m,22459,15.1240,68.8520,50
+ASV_00004,GCTACTACCGATTGAACATTTTAGTGAGGCCTTCGGACTGTGACCGGGCGGGTCGCCCGGCCTGGTCTACGGGAAGACGACCAAACTGTAGTGTTTAGAGGAAGTAAAAGTCGTAACAAGGTTTCC,Station_02_12m,19312,16.4520,70.2140,12
+ASV_00005,TACTACCGATTGAACATTTTAGTGAGGTCTTCGGACTGTGAGCCAGGCGGGTCGCCCTGCCTGGTCTACGGGAAGACGACCAAACTGTAGTGTTTAGAGGAAGTAAAAGTCGTAACAAGGTTTCC,Station_02_100m,8640,16.4520,70.2140,100`;
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', 'reference_asv_template.csv');
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              className="px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/15 text-sky-400 rounded font-mono text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Download sample ASV CSV template to test or fill"
+            >
+              <Download size={14} />
+              <span>Download Template</span>
+            </button>
+            <button
               onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2 bg-[#0e1d35] hover:bg-[#1a2e4e] border border-sky-400 text-white rounded font-mono text-xs flex items-center gap-1.5 transition-colors"
+              className="px-4 py-2 bg-[#0e1d35] hover:bg-[#1a2e4e] border border-sky-400 text-white rounded font-mono text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Upload size={14} />
               <span>Browse File</span>

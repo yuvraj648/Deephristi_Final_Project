@@ -4,7 +4,7 @@
 // ========================================================
 
 import React, { useState, useRef } from 'react';
-import { ArrowLeft, Upload, FileCode, Dna, CheckCircle2, AlertCircle, FileText, Check, ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowLeft, Upload, Download, FileCode, Dna, CheckCircle2, AlertCircle, FileText, Check, ArrowRight, Loader2 } from 'lucide-react';
 import { parseAsvTable, parseSampleMetadata, inferSampleMetadataFromId } from '../../services/dataService';
 import type { ASV, Occurrence, Sample, ValidationWarning } from '../../domain/types';
 
@@ -283,6 +283,31 @@ SMP_003\tStation S03 - Bathyal Margin\t14.85\t68.80\t1200\t2026-03-18\tR1`;
     });
 
     setIsProcessing(false);
+  };
+
+  // Download reference ASV CSV template for users to fill and upload
+  const handleDownloadReferenceTemplate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const csvContent = `ASV_ID,Sequence,Sample_ID,Reads,Latitude,Longitude,Depth_m
+ASV_00001,GCTACTACCGATTGAACATTTTAGTGAGGTCCTCGGACTGTGAGCCAGGCGGGTCGCCCTGCCTGGTCTACGGGAAGACGACCAAACTGTAGTGTTTAGAGGAAGTAAAAGTCGTAACAAGGTTTCC,Station_01_12m,14825,15.1240,68.8520,12
+ASV_00002,TACTACCGATTGAATGTTTTAGTGAGGCCTTCGGACTGCGACCGGGCGGGTCGCCCGGCTTGGTCTACGGGAAGACGACCAAACTGTAGTGTTTAGAGGAAGTAAAAGTCGTAACAAGGTTTCC,Station_01_12m,9540,15.1240,68.8520,12
+ASV_00003,GCTACTACCGATTGAATATTTTAGTGAGGTCCTCGGACTGTGAGCCAGGCGGGTCGCCCTGCCTGGTCTACGGGAAGACGACCAAACTGTAGTGTTTAGAGGAAGTAAAAGTCGTAACAAGGTTTCC,Station_01_50m,22459,15.1240,68.8520,50
+ASV_00004,GCTACTACCGATTGAACATTTTAGTGAGGCCTTCGGACTGTGACCGGGCGGGTCGCCCGGCCTGGTCTACGGGAAGACGACCAAACTGTAGTGTTTAGAGGAAGTAAAAGTCGTAACAAGGTTTCC,Station_02_12m,19312,16.4520,70.2140,12
+ASV_00005,TACTACCGATTGAACATTTTAGTGAGGTCTTCGGACTGTGAGCCAGGCGGGTCGCCCTGCCTGGTCTACGGGAAGACGACCAAACTGTAGTGTTTAGAGGAAGTAAAAGTCGTAACAAGGTTTCC,Station_02_100m,8640,16.4520,70.2140,100
+ASV_00006,GCTACTACCGATTGAATATTTTAGTGAGGCCTTCGGACTGTGAGCCAGGCGGGTCGCCCGGCCTGGTCTACGGGAAGACGACCAAACTGTAGTGTTTAGAGGAAGTAAAAGTCGTAACAAGGTTTCC,Station_03_50m,16491,17.8200,71.4500,50
+ASV_00007,GCTACTACCGATTGAACATTTTAGTGAGGTCCTCGGACTGTGAGCCAGGCGGGTCGCCCGGCCTGGTCTACGGGAAGACGACCAAACTGTAGTGTTTAGAGGAAGTAAAAGTCGTAACAAGGTTTCC,Station_03_200m,7779,17.8200,71.4500,200
+ASV_00008,TACTACCGATTGAATGTTTTAGTGAGGTCTTCGGACTGCGACCGGGCGGGTCGCCCGGCCTGGTCTACGGGAAGACGACCAAACTGTAGTGTTTAGAGGAAGTAAAAGTCGTAACAAGGTTTCC,Station_04_12m,11175,18.9100,72.6800,12
+ASV_00009,GCTACTACCGATTGAACATTTTAGTGAGGCCCTCGGACTGTGAGCCAGGCGGGTCGCCCTGCCTGGTCTACGGGAAGACGACCAAACTGTAGTGTTTAGAGGAAGTAAAAGTCGTAACAAGGTTTCC,Station_04_500m,5430,18.9100,72.6800,500
+ASV_00010,GCTACTACCGATTGAATATTTTAGTGAGGTCCTCGGACTGCGACCGGGCGGGTCGCCCGGCCTGGTCTACGGGAAGACGACCAAACTGTAGTGTTTAGAGGAAGTAAAAGTCGTAACAAGGTTTCC,Station_04_1200m,3146,18.9100,72.6800,1200`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'reference_asv_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Dispatch to Data Configuration stage
@@ -610,6 +635,17 @@ SMP_003\tStation S03 - Bathyal Margin\t14.85\t68.80\t1200\t2026-03-18\tR1`;
                   className="w-full py-1.5 px-2 bg-paper-sunk hover:bg-paper border border-rule text-ink-muted hover:text-ink font-mono text-[11px] rounded-control transition-colors text-center"
                 >
                   Load Sample Ingestion Table (Matrix + Stations)
+                </button>
+
+                {/* Download Reference ASV Template Button */}
+                <button
+                  type="button"
+                  onClick={handleDownloadReferenceTemplate}
+                  className="w-full py-2 px-3 bg-[#032034] hover:bg-[#07304e] border border-sky-500/50 text-sky-300 font-mono text-[11px] font-semibold rounded-control transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                  title="Download pre-formatted reference CSV file with sample ASVs and coordinates"
+                >
+                  <Download size={13} className="text-sky-400" />
+                  <span>Download Reference ASV Template (.csv)</span>
                 </button>
               </div>
             </div>
