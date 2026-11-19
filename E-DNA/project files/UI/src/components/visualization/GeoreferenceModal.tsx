@@ -5,6 +5,7 @@
 // ========================================================
 
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import { X, MapPin, Sparkles, Save, Check } from 'lucide-react';
 import type { Expedition, Sample } from '../../domain/types';
 import { saveExpedition } from '../../services/dataService';
@@ -113,8 +114,8 @@ export const GeoreferenceModal: React.FC<GeoreferenceModalProps> = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 backdrop-blur-sm p-4 select-none animate-in fade-in duration-150">
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 select-none">
       <div className="bg-paper-raised border border-rule-strong rounded-plate shadow-floating w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-5 py-4 border-b border-rule flex items-center justify-between bg-paper-sunk/40">
@@ -278,6 +279,7 @@ export const GeoreferenceModal: React.FC<GeoreferenceModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

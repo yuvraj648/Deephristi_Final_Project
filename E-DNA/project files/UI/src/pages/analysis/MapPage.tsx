@@ -10,7 +10,7 @@ import { HydrographicMap } from '../../components/visualization/HydrographicMap'
 import type { MapMetricType } from '../../components/visualization/HydrographicMap';
 import { LocationTaxaHeatmap } from '../../components/visualization/LocationTaxaHeatmap';
 import { KPICard } from '../../components/common/KPICard';
-import { MapPin, LayoutGrid, Layers, Columns, ArrowRight } from 'lucide-react';
+import { MapPin, LayoutGrid, Layers, Columns, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 type WorkstationView = 'gis_chart' | 'taxa_heatmap' | 'combined';
 
@@ -18,6 +18,7 @@ export const MapPage: React.FC = () => {
   const { siteProfiles, selectedSiteId, setActiveDrawer } = useAnalysis();
   const [metric, setMetric] = useState<MapMetricType>('taxaRichness');
   const [workstationView, setWorkstationView] = useState<WorkstationView>('gis_chart');
+  const [showSideProfile, setShowSideProfile] = useState(true);
 
   // Currently selected site profile or first available
   const activeProfile = selectedSiteId
@@ -85,9 +86,9 @@ export const MapPage: React.FC = () => {
       {(workstationView === 'gis_chart' || workstationView === 'combined') && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Large Interactive Map */}
-          <div className="lg:col-span-8 flex flex-col space-y-2">
+          <div className={`${showSideProfile ? 'lg:col-span-8' : 'lg:col-span-12'} flex flex-col space-y-2 transition-all`}>
             <HydrographicMap
-              height={workstationView === 'combined' ? 'h-[430px]' : 'h-[500px]'}
+              height={workstationView === 'combined' ? 'h-[480px]' : 'h-[580px]'}
               selectedMetric={metric}
               onSelectMetric={setMetric}
             />
@@ -95,107 +96,132 @@ export const MapPage: React.FC = () => {
               <span className="italic">
                 Fig. 1 — Hydrographic chart with calibrated isobaths, graticule frame, and dynamic teardrop pins. Click any pin to load telemetry.
               </span>
-              {workstationView === 'gis_chart' && (
-                <button
-                  type="button"
-                  onClick={() => setWorkstationView('taxa_heatmap')}
-                  className="text-survey hover:underline flex items-center gap-1 font-sans"
-                >
-                  <span>Open Heatmap Matrix</span>
-                  <ArrowRight size={12} />
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                {!showSideProfile && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSideProfile(true)}
+                    className="text-sky-400 hover:text-sky-300 flex items-center gap-1 font-mono text-[11px]"
+                    title="Show station telemetry profile"
+                  >
+                    <Eye size={13} />
+                    <span>Show Station Profile</span>
+                  </button>
+                )}
+                {workstationView === 'gis_chart' && (
+                  <button
+                    type="button"
+                    onClick={() => setWorkstationView('taxa_heatmap')}
+                    className="text-survey hover:underline flex items-center gap-1 font-sans"
+                  >
+                    <span>Open Heatmap Matrix</span>
+                    <ArrowRight size={12} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Right-Side Analysis Profile */}
-          <div className="lg:col-span-4 bg-paper-raised border border-rule rounded-plate p-5 space-y-5">
-            <div className="border-b border-rule pb-3">
-              <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-ink-faint block">
-                Active Station Profile
-              </span>
-              <h2 className="font-serif text-[18px] font-medium text-ink flex items-center gap-1.5 mt-0.5">
-                <MapPin size={16} className="text-survey shrink-0" />
-                <span className="truncate">{activeProfile ? activeProfile.site : 'No Station Selected'}</span>
-              </h2>
-            </div>
-
-            {activeProfile ? (
-              <div className="space-y-4">
-                {/* Coordinates & Depths */}
-                <div className="bg-paper-sunk/60 border border-rule rounded-plate p-3 text-[12px] font-mono space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-ink-faint">Coordinates:</span>
-                    <span className="text-ink font-medium">
-                      {activeProfile.latitude !== undefined && activeProfile.longitude !== undefined
-                        ? `${activeProfile.latitude.toFixed(2)}°N, ${activeProfile.longitude.toFixed(2)}°E`
-                        : 'Requires metadata'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-ink-faint">Sampling Depths:</span>
-                    <span className="text-ink font-medium">
-                      {activeProfile.depths.length > 0 ? activeProfile.depths.map((d) => `${d}m`).join(', ') : 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-ink-faint">Total Reads:</span>
-                    <span className="text-ink font-semibold tabular-nums">
-                      {activeProfile.totalAbundance.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Station Biodiversity Metrics */}
-                <div className="grid grid-cols-2 gap-2">
-                  <KPICard eyebrow="ASVs" value={activeProfile.asvCount} />
-                  <KPICard eyebrow="Taxa" value={activeProfile.taxaCount} />
-                  <KPICard eyebrow="Shannon" value={activeProfile.shannon} unit="H'" />
-                  <KPICard eyebrow="Simpson" value={activeProfile.simpson} unit="1-D" />
-                </div>
-
-                {/* Dominant Taxa */}
+          {showSideProfile && (
+            <div className="lg:col-span-4 bg-[#050A14] border border-rule rounded-plate p-5 space-y-4 max-h-[580px] overflow-y-auto shadow-xl">
+              <div className="border-b border-rule pb-3 flex items-start justify-between">
                 <div>
-                  <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-ink-faint block mb-2">
-                    Dominant Detected Groups
+                  <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-sky-400 block font-semibold">
+                    Active Station Profile
                   </span>
-                  <div className="border border-rule rounded-plate overflow-hidden max-h-[140px] overflow-y-auto">
-                    <table className="w-full text-left text-[11px] font-mono">
-                      <thead className="bg-paper-sunk border-b border-rule sticky top-0">
-                        <tr>
-                          <th className="px-2.5 py-1 text-ink-muted font-normal">Taxon</th>
-                          <th className="px-2.5 py-1 text-ink-muted font-normal text-right">%</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-rule bg-paper">
-                        {activeProfile.dominantTaxa.map((d, i) => (
-                          <tr key={i}>
-                            <td className="px-2.5 py-1 text-ink">{d.taxon}</td>
-                            <td className="px-2.5 py-1 text-right text-ink font-medium tabular-nums">
-                              {d.percentage}%
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <h2 className="font-serif text-[18px] font-medium text-white flex items-center gap-1.5 mt-0.5">
+                    <MapPin size={16} className="text-sky-400 shrink-0" />
+                    <span className="truncate">{activeProfile ? activeProfile.site : 'No Station Selected'}</span>
+                  </h2>
                 </div>
-
-                {/* Inspect Full Station Action */}
                 <button
                   type="button"
-                  onClick={() => setActiveDrawer({ type: 'site', id: activeProfile.site })}
-                  className="w-full py-2 bg-paper border border-rule hover:border-survey text-ink hover:text-survey font-mono text-[12px] rounded-control transition-colors"
+                  onClick={() => setShowSideProfile(false)}
+                  className="p-1 rounded text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+                  title="Hide side panel to maximize map"
                 >
-                  Inspect Detailed Station Dossier →
+                  <EyeOff size={15} />
                 </button>
               </div>
-            ) : (
-              <div className="py-8 text-center text-ink-faint font-mono text-[12px]">
-                Select a station on the chart to inspect.
-              </div>
-            )}
-          </div>
+
+              {activeProfile ? (
+                <div className="space-y-4 font-sans">
+                  {/* Coordinates & Depths */}
+                  <div className="bg-[#03070E] border border-rule rounded p-3 text-[12px] font-mono space-y-1.5">
+                    <div className="flex justify-between">
+                      <span className="text-neutral-400">Coordinates:</span>
+                      <span className="text-sky-300 font-semibold">
+                        {activeProfile.latitude !== undefined && activeProfile.longitude !== undefined
+                          ? `${activeProfile.latitude.toFixed(4)}°N, ${activeProfile.longitude.toFixed(4)}°E`
+                          : 'Requires metadata'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-neutral-400">Sampling Depths:</span>
+                      <span className="text-white font-medium">
+                        {activeProfile.depths.length > 0 ? activeProfile.depths.map((d) => `${d}m`).join(', ') : 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-neutral-400">Total Reads:</span>
+                      <span className="text-white font-semibold tabular-nums">
+                        {activeProfile.totalAbundance.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Station Biodiversity Metrics */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <KPICard eyebrow="ASVs" value={activeProfile.asvCount} />
+                    <KPICard eyebrow="Taxa" value={activeProfile.taxaCount} />
+                    <KPICard eyebrow="Shannon" value={activeProfile.shannon} unit="H'" />
+                    <KPICard eyebrow="Simpson" value={activeProfile.simpson} unit="1-D" />
+                  </div>
+
+                  {/* Dominant Taxa */}
+                  <div>
+                    <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-neutral-400 block mb-2 font-semibold">
+                      Dominant Detected Groups
+                    </span>
+                    <div className="border border-rule rounded overflow-hidden max-h-[140px] overflow-y-auto">
+                      <table className="w-full text-left text-[11px] font-mono">
+                        <thead className="bg-[#03070E] border-b border-rule sticky top-0">
+                          <tr>
+                            <th className="px-2.5 py-1 text-neutral-400 font-normal">Taxon</th>
+                            <th className="px-2.5 py-1 text-neutral-400 font-normal text-right">%</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-rule/60 bg-[#050A14]">
+                          {activeProfile.dominantTaxa.map((d, i) => (
+                            <tr key={i}>
+                              <td className="px-2.5 py-1 text-neutral-200">{d.taxon}</td>
+                              <td className="px-2.5 py-1 text-right text-sky-400 font-semibold tabular-nums">
+                                {d.percentage}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Inspect Full Station Action */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveDrawer({ type: 'site', id: activeProfile.site })}
+                    className="w-full py-2 bg-[#0284c7] hover:bg-[#0369a1] text-white font-semibold rounded text-xs transition-colors shadow-md font-mono"
+                  >
+                    Inspect Detailed Station Dossier →
+                  </button>
+                </div>
+              ) : (
+                <div className="py-8 text-center text-neutral-400 font-mono text-[12px]">
+                  Select a station on the chart to inspect.
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

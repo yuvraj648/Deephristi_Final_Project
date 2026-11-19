@@ -189,15 +189,19 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
   const [showTransect, setShowTransect] = useState(true);
   const [stationResolution, setStationResolution] = useState<'primary3' | 'all21'>('primary3');
 
-  // Allow popups to trigger expanding to all 21 stations
+  // Allow popups to trigger expanding to all 21 stations or opening drawer
   useEffect(() => {
     (window as any).__deepdrishti_show_all_stations = () => {
       setStationResolution('all21');
     };
+    (window as any).__deepdrishti_open_station_dossier = (siteId: string) => {
+      setActiveDrawer({ type: 'site', id: siteId });
+    };
     return () => {
       delete (window as any).__deepdrishti_show_all_stations;
+      delete (window as any).__deepdrishti_open_station_dossier;
     };
-  }, []);
+  }, [setActiveDrawer]);
 
   // Filter sites with coordinates or provide automatic regional transect positioning
   const displaySites = useMemo(() => {
@@ -532,8 +536,21 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
               </button>
             </div>
           ` : `
-            <div style="font-size:10px;text-align:center;color:#0284C7;background:#F0F9FF;padding:4px;border-radius:4px;border:1px solid #BAE6FD;">
-              Click to inspect biological dossier →
+            <div style="margin-top:6px;padding-top:6px;border-top:1px dashed #CBD5E1;text-align:center;">
+              <button onclick="window.__deepdrishti_open_station_dossier && window.__deepdrishti_open_station_dossier('${site.firstSubSite || site.site}')" style="
+                width:100%;
+                padding:5px 8px;
+                background:#0284C7;
+                color:white;
+                border:none;
+                border-radius:4px;
+                cursor:pointer;
+                font-family:monospace;
+                font-size:11px;
+                font-weight:bold;
+              ">
+                Inspect Detailed Dossier →
+              </button>
             </div>
           `}
         </div>
@@ -551,7 +568,6 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
       marker.on('click', () => {
         const targetSite = site.firstSubSite || site.site;
         setSelectedSiteId(targetSite);
-        setActiveDrawer({ type: 'site', id: targetSite });
       });
 
       mg.addLayer(marker);

@@ -4,6 +4,7 @@
 // ========================================================
 
 import React, { useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { X } from 'lucide-react';
 
 interface DrawerProps {
@@ -21,7 +22,7 @@ export const Drawer: React.FC<DrawerProps> = ({
   title,
   eyebrow,
   children,
-  width = 'w-[440px]',
+  width = 'w-[480px]',
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -33,38 +34,39 @@ export const Drawer: React.FC<DrawerProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      {/* Backdrop */}
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 top-14 z-[9990] flex justify-end">
+      {/* Backdrop that dims and allows click-outside to close */}
       <div
-        className="fixed inset-0 bg-ink/30 transition-opacity backdrop-none"
+        className="fixed inset-0 top-14 bg-black/60 backdrop-blur-xs transition-opacity"
         onClick={onClose}
       />
 
-      {/* Slide-over panel */}
+      {/* Slide-over panel positioned strictly below header */}
       <div
-        className={`relative z-10 ${width} max-w-full h-full bg-paper-raised border-l border-rule shadow-floating flex flex-col`}
+        className={`relative z-10 ${width} max-w-full h-full bg-[#070D18] border-l border-rule shadow-2xl flex flex-col font-sans`}
       >
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-rule bg-paper-sunk/40">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-rule bg-[#050A14] flex-shrink-0">
           <div>
             {eyebrow && (
-              <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-ink-faint block">
+              <span className="text-[11px] font-mono uppercase tracking-[0.08em] text-sky-400 block font-semibold">
                 {eyebrow}
               </span>
             )}
-            <h3 className="font-serif font-medium text-[18px] text-ink">{title}</h3>
+            <h3 className="font-serif font-medium text-[18px] text-white">{title}</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-control hover:bg-paper-sunk text-ink-muted hover:text-ink transition-colors"
+            className="p-1 rounded-control hover:bg-white/10 text-neutral-400 hover:text-white transition-colors"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5">{children}</div>
+        <div className="flex-1 overflow-y-auto p-5 text-ink">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
