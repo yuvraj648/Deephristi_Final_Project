@@ -576,28 +576,36 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ onNavigate }) => {
           eyebrow={`Taxa Richness (${filters.taxonomicRank})`}
           value={kpis.taxaDetected}
           meta={`${kpis.siteCount} stations sampled`}
-          description="Total unique biological taxa classified at the active taxonomic rank across sampled hydrographic stations."
+          meaning="Total unique biological taxa classified at the active taxonomic rank across sampled hydrographic stations."
+          formula="Taxa Count = Count of unique taxonomic names at active rank"
+          interpretation="Indicates broad phylogenetic richness and taxonomic variety across sampled ocean stations."
         />
         <KPICard
           eyebrow="Shannon Diversity"
           value={kpis.shannonDiversity}
           unit="H'"
           meta="pooled regional diversity"
-          description="Information-theoretic index (H') quantifying community biological richness and relative abundance equitability."
+          meaning="Information-theoretic entropy index (H') quantifying biological community richness and relative abundance equitability."
+          formula="H' = - Σ [ p_i × ln(p_i) ]"
+          interpretation="Higher H' reflects a healthy, mature marine ecosystem where reads are evenly distributed across taxa."
         />
         <KPICard
           eyebrow="Candidate Divergent Lineages"
           value={kpis.potentiallyUnknownGroups}
           divergent={kpis.potentiallyUnknownGroups > 0}
           meta={`${expedition.clusters.length} diagnostic clusters`}
-          description="Candidate evolutionary lineages exhibiting >12% nucleotide divergence from published reference barcodes."
+          meaning="Candidate evolutionary lineages exhibiting >12% nucleotide divergence from published SILVA/NCBI reference barcodes."
+          formula="Divergence Distance = min ||Latent_Vector - Known_Centroid|| > 7.78"
+          interpretation="Identifies potentially newly discovered or undocumented deep-sea organisms requiring physical specimen validation."
         />
         <KPICard
           eyebrow="Linnaean Resolution Depth"
           value="7 / 7"
           unit="ranks"
           meta="Kingdom → Species 100% complete"
-          description="Complete 7-level taxonomic classification resolved across all cataloged marine amplicon sequence variants."
+          meaning="Complete 7-level taxonomic classification resolved across all cataloged marine amplicon sequence variants."
+          formula="Kingdom → Phylum → Class → Order → Family → Genus → Species"
+          interpretation="Full 7-level Linnaean resolution ensures complete, authoritative taxonomic lineages with zero blank ranks."
         />
       </div>
 
