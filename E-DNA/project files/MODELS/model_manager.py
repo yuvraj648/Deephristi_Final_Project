@@ -301,6 +301,25 @@ class ModelManager:
         self.dnabert_model = None
         self.dnabert_classes = []
 
+        # Hardware Compute Device Detection (GPU vs Laptop CPU Fallback)
+        try:
+            import torch
+            if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+                self.device = torch.device("cuda")
+                self.is_gpu = True
+                self.gpu_name = torch.cuda.get_device_name(0)
+                print(f"[ModelManager] Hardware acceleration enabled: GPU ({self.gpu_name})")
+            else:
+                self.device = torch.device("cpu")
+                self.is_gpu = False
+                self.gpu_name = "CPU (Laptop Fallback)"
+                print("[ModelManager] Operating on host CPU (Laptop Fallback).")
+        except Exception as e:
+            self.device = "cpu"
+            self.is_gpu = False
+            self.gpu_name = "CPU (Laptop Fallback)"
+            print(f"[ModelManager] GPU check exception ({e}); default to CPU.")
+
         # Verified Marine Reference Catalog
         self.reference_catalog = {}
         self._load_reference_catalog()
@@ -469,6 +488,8 @@ class ModelManager:
 
             dnabert_model = CustomHead(base, n_classes)
             dnabert_model.load_state_dict(ckpt["model_state"], strict=False)
+            if hasattr(self, "device") and self.device:
+                dnabert_model.to(self.device)
             dnabert_model.eval()
 
             self.dnabert_tokenizer = tokenizer
@@ -627,11 +648,14 @@ class ModelManager:
 
         import torch
         inputs = self.dnabert_tokenizer([clean_seq], padding=True, truncation=True, max_length=128, return_tensors="pt")
+        if hasattr(self, "device") and str(self.device) != "cpu":
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+
         with torch.no_grad():
             out = self.dnabert_model(**inputs)
             logits = out.logits
-            probs = torch.softmax(logits, dim=-1).numpy()[0]
-            emb = out.hidden.numpy()[0]
+            probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
+            emb = out.hidden.cpu().numpy()[0]
 
         pred_idx = int(np.argmax(probs))
         predicted_phylum = str(self.dnabert_classes[pred_idx])

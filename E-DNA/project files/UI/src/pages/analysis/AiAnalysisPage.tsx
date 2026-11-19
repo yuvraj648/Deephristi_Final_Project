@@ -736,7 +736,11 @@ const FastqAnalysisSection: React.FC = () => {
       const result = await resp.json();
       const rawAsvs = result.asvs || [];
       const occs = result.occurrences || [];
-      setStats(result.stats || null);
+      setStats({
+        ...result.stats,
+        total_reads_parsed: result.stats?.total_reads ?? result.stats?.total_reads_parsed,
+        reads_passed_qc: result.stats?.filtered_reads ?? result.stats?.reads_passed_qc,
+      });
 
       if (rawAsvs.length === 0) {
         throw new Error('No valid biological variants were identified from the FASTQ file.');
@@ -917,6 +921,28 @@ const FastqAnalysisSection: React.FC = () => {
           <div className="p-3.5 bg-emerald-950/40 border border-emerald-800/60 rounded flex items-center gap-3 text-xs font-mono text-emerald-300">
             <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />
             <span>{success}</span>
+          </div>
+        )}
+
+        {/* Hardware Compute Acceleration Banner */}
+        {stats && (stats.compute_device || stats.gpu_accelerated !== undefined) && (
+          <div className="p-3 bg-[#030a13] border border-sky-500/30 rounded flex flex-wrap items-center justify-between gap-2 font-mono text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-neutral-400">Hardware Compute Engine:</span>
+              <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border flex items-center gap-1.5 ${
+                stats.gpu_accelerated
+                  ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
+                  : 'bg-sky-950/50 border-sky-500/40 text-sky-300'
+              }`}>
+                <span>{stats.gpu_accelerated ? '⚡' : '💻'}</span>
+                <span>{stats.compute_device || (stats.gpu_accelerated ? 'GPU Hardware Accelerated' : 'CPU Mode (Laptop Fallback)')}</span>
+              </span>
+            </div>
+            {stats.processing_time_seconds !== undefined && (
+              <span className="text-neutral-400 text-[11px]">
+                Execution Time: <strong className="text-white font-semibold">{stats.processing_time_seconds}s</strong>
+              </span>
+            )}
           </div>
         )}
 

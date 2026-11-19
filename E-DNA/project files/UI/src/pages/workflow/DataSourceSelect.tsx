@@ -38,6 +38,9 @@ export const DataSourceSelect: React.FC<DataSourceSelectProps> = ({
     total_reads: number;
     filtered_reads: number;
     unique_asvs: number;
+    compute_device?: string;
+    gpu_accelerated?: boolean;
+    processing_time_seconds?: number;
   } | null>(null);
   const [fastqFile, setFastqFile] = useState<{
     name: string;
@@ -202,6 +205,9 @@ export const DataSourceSelect: React.FC<DataSourceSelectProps> = ({
         total_reads: result.stats.total_reads,
         filtered_reads: result.stats.filtered_reads,
         unique_asvs: result.stats.unique_asvs,
+        compute_device: result.stats.compute_device,
+        gpu_accelerated: result.stats.gpu_accelerated,
+        processing_time_seconds: result.stats.processing_time_seconds,
       });
 
       // Map backend result → frontend ASV/Occurrence/Sample types
@@ -742,6 +748,23 @@ ASV_00010,GCTACTACCGATTGAATATTTTAGTGAGGTCCTCGGACTGCGACCGGGCGGGTCGCCCGGCCTGGTCTAC
                         </div>
                       ))}
                     </div>
+
+                    {/* Hardware compute badge (GPU vs CPU Fallback) */}
+                    <div className="p-2 bg-[#02070e] border border-rule rounded-control flex items-center justify-between text-[11px] font-mono">
+                      <span className="flex items-center gap-1.5">
+                        <span>{fastqStats.gpu_accelerated ? '⚡' : '💻'}</span>
+                        <span className="text-ink-muted">Hardware:</span>
+                        <strong className={fastqStats.gpu_accelerated ? 'text-emerald-400 font-semibold' : 'text-sky-300'}>
+                          {fastqStats.compute_device || (fastqStats.gpu_accelerated ? 'GPU Acceleration' : 'CPU (Laptop Fallback)')}
+                        </strong>
+                      </span>
+                      {fastqStats.processing_time_seconds !== undefined && (
+                        <span className="text-ink-faint text-[10px]">
+                          Time: <strong className="text-ink">{fastqStats.processing_time_seconds}s</strong>
+                        </span>
+                      )}
+                    </div>
+
                     <p className="text-[10px] font-mono text-ink-faint text-center">
                       Quality filter: Q≥20 · Length 100–600 bp · Singleton removal applied
                     </p>

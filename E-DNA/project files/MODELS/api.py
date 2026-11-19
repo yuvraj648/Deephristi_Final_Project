@@ -1,5 +1,6 @@
 import os
 import io
+import time
 import gzip
 import json
 import pickle
@@ -313,13 +314,107 @@ def parse_fastq_bytes(raw_bytes: bytes) -> List[Tuple[str, str]]:
     return reads
 
 
-def filter_reads(reads: List[Tuple[str, str]]) -> List[str]:
+# ============================================================
+# COMPUTE ACCELERATION ENGINE — GPU (CUDA) WITH CPU FALLBACK
+# ============================================================
+
+def get_compute_device() -> Tuple[str, str, bool]:
     """
-    Quality-filter reads:
+    Check if a dedicated GPU (e.g. NVIDIA CUDA) is available on this laptop.
+    Returns:
+        device_type: "cuda" or "cpu"
+        device_name: e.g. "GPU (NVIDIA GeForce RTX 4060)" or "CPU (Laptop / Host Fallback)"
+        is_gpu: True if GPU is available and active, False for CPU fallback
+    """
+    try:
+        import torch
+        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+            gpu_name = torch.cuda.get_device_name(0)
+            return "cuda", f"GPU ({gpu_name})", True
+    except Exception:
+        pass
+    return "cpu", "CPU (Laptop / Host Fallback)", False
+
+
+@app.get("/hardware")
+def get_hardware_status():
+    """Exposes real-time hardware acceleration telemetry to UI."""
+    device_type, device_name, is_gpu = get_compute_device()
+    info = {
+        "device_type": device_type,
+        "device_name": device_name,
+        "gpu_available": is_gpu,
+        "acceleration_mode": "GPU Accelerated" if is_gpu else "Standard CPU Mode (Laptop)",
+    }
+    try:
+        import torch
+        if is_gpu:
+            info["cuda_version"] = torch.version.cuda
+            info["device_count"] = torch.cuda.device_count()
+            info["memory_allocated_mb"] = round(torch.cuda.memory_allocated(0) / (1024 * 1024), 2)
+            info["max_memory_mb"] = round(torch.cuda.get_device_properties(0).total_memory / (1024 * 1024), 2)
+    except Exception:
+        pass
+    return info
+
+
+def filter_reads_gpu(reads: List[Tuple[str, str]], device_name: str = "cuda") -> List[str]:
+    """
+    Hardware-accelerated quality filtering using PyTorch GPU tensors.
+    Processes ASCII Phred scores in parallel vectors across thousands of reads.
+    """
+    import torch
+    MIN_LEN = 100
+    MAX_LEN = 600
+    MIN_Q = 20.0
+    MAX_N_FRAC = 0.01
+
+    # Pre-filter candidate lengths
+    candidates: List[Tuple[str, str]] = []
+    for seq, qual in reads:
+        l = len(seq)
+        if MIN_LEN <= l <= MAX_LEN and (seq.count('N') / max(l, 1)) <= MAX_N_FRAC:
+            candidates.append((seq, qual))
+
+    if not candidates:
+        return []
+
+    clean: List[str] = []
+    CHUNK_SIZE = 16384
+    dev = torch.device(device_name)
+
+    for i in range(0, len(candidates), CHUNK_SIZE):
+        chunk = candidates[i:i + CHUNK_SIZE]
+        lengths = [len(q) for _, q in chunk]
+        max_l = max(lengths)
+
+        # Build 2D byte matrix on GPU (Phred 0 = ASCII 33)
+        mat = torch.full((len(chunk), max_l), 33, dtype=torch.uint8, device=dev)
+        for r_idx, (_, q) in enumerate(chunk):
+            mat[r_idx, :len(q)] = torch.tensor([ord(c) for c in q], dtype=torch.uint8, device=dev)
+
+        len_tensor = torch.tensor(lengths, dtype=torch.float32, device=dev)
+        col_idx = torch.arange(max_l, device=dev).unsqueeze(0).expand(len(chunk), -1)
+        valid_mask = col_idx < len_tensor.unsqueeze(1)
+
+        # Parallel Phred Q = ASCII - 33
+        scores = (mat.float() - 33.0) * valid_mask.float()
+        mean_q = scores.sum(dim=1) / len_tensor.clamp(min=1.0)
+
+        pass_arr = (mean_q >= MIN_Q).cpu().numpy()
+        for r_idx, passed in enumerate(pass_arr):
+            if passed:
+                clean.append(chunk[r_idx][0])
+
+    return clean
+
+
+def filter_reads_cpu(reads: List[Tuple[str, str]]) -> List[str]:
+    """
+    Standard CPU quality-filtering fallback:
       - Minimum average Phred Q-score ≥ 20
       - Length 100 – 600 bp
       - Ambiguous base fraction ≤ 1%
-    Returns clean sequences only (no quality string needed downstream).
     """
     MIN_LEN = 100
     MAX_LEN = 600
@@ -330,7 +425,6 @@ def filter_reads(reads: List[Tuple[str, str]]) -> List[str]:
     for seq, qual in reads:
         if not (MIN_LEN <= len(seq) <= MAX_LEN):
             continue
-        # Phred Q-score from ASCII (Phred+33 encoding)
         if qual:
             avg_q = sum(ord(c) - 33 for c in qual) / len(qual)
             if avg_q < MIN_Q:
@@ -340,6 +434,26 @@ def filter_reads(reads: List[Tuple[str, str]]) -> List[str]:
             continue
         good.append(seq)
     return good
+
+
+def filter_reads(reads: List[Tuple[str, str]]) -> Tuple[List[str], str, bool]:
+    """
+    Intelligent hardware routing:
+    Attempts GPU processing first; if unavailable or upon any warning,
+    seamlessly falls back to CPU so FASTQ processing never fails.
+    """
+    device_type, device_name, is_gpu = get_compute_device()
+    if is_gpu:
+        try:
+            print(f"[FASTQ Pipeline] GPU available: routing to {device_name} for hardware acceleration...")
+            clean = filter_reads_gpu(reads, device_name=device_type)
+            return clean, device_name, True
+        except Exception as e:
+            print(f"[FASTQ Pipeline] GPU processing notice ({e}); falling back to host CPU.")
+
+    print(f"[FASTQ Pipeline] Processing on host CPU (Laptop Fallback).")
+    clean = filter_reads_cpu(reads)
+    return clean, "CPU (Laptop / Host Fallback)", False
 
 
 def cluster_to_asvs(seqs: List[str]) -> Dict[str, int]:
@@ -358,18 +472,11 @@ def cluster_to_asvs(seqs: List[str]) -> Dict[str, int]:
 @app.post("/process/fastq")
 async def process_fastq(file: UploadFile = File(...)):
     """
-    Accept a demultiplexed FASTQ or FASTQ.gz file, run quality-filtering and
-    exact-sequence clustering, and return an ASV table ready for taxonomy
-    classification via /predict/batch.
-
-    Response JSON:
-    {
-      "asvs":        [{"asv_id": "ASV_00001", "sequence": "...", "abundance": 1234}],
-      "samples":     [{"sample_id": "...", "site": "..."}],
-      "occurrences": [{"asv_id": "...", "sample_id": "...", "abundance": 1234}],
-      "stats": {"total_reads": N, "filtered_reads": M, "unique_asvs": K}
-    }
+    Accept a demultiplexed FASTQ or FASTQ.gz file, run hardware-accelerated
+    quality-filtering (with GPU-to-CPU automatic fallback) and exact-sequence
+    clustering, returning an ASV table ready for taxonomy classification.
     """
+    t_start = time.time()
     filename = file.filename or "uploaded.fastq"
     raw = await file.read()
 
@@ -386,8 +493,8 @@ async def process_fastq(file: UploadFile = File(...)):
             detail="No FASTQ records could be parsed. Ensure the file is a valid FASTQ or FASTQ.gz archive."
         )
 
-    # 2. Quality filter
-    clean_seqs = filter_reads(all_reads)
+    # 2. Quality filter — GPU accelerated with automatic CPU fallback
+    clean_seqs, compute_device, is_gpu = filter_reads(all_reads)
     filtered_reads = len(clean_seqs)
 
     # 3. Cluster to ASVs (exact deduplication + singleton removal)
@@ -439,6 +546,8 @@ async def process_fastq(file: UploadFile = File(...)):
         "site": site_name,
     }]
 
+    elapsed_sec = round(time.time() - t_start, 3)
+
     return {
         "asvs": asvs_out,
         "samples": samples_out,
@@ -448,6 +557,9 @@ async def process_fastq(file: UploadFile = File(...)):
             "filtered_reads": filtered_reads,
             "unique_asvs": len(asvs_out),
             "singleton_removed": filtered_reads - sum(asv_map.values()),
+            "compute_device": compute_device,
+            "gpu_accelerated": is_gpu,
+            "processing_time_seconds": elapsed_sec,
         }
     }
 
