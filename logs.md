@@ -336,3 +336,10 @@ All five local endpoints returned HTTP 200 during the verification on 2026-11-18
 
 - The hero's poster previously showed a later submarine frame while the video was still loading, making the initial screen differ from the clip's ocean-surface opening.
 - Replaced the poster with a frame from the opening half-second of the 60 FPS clip so the initial/loading view matches the intended second reference image and the video sequence.
+
+## 19. 2026-11-19 - Direct navigation to surveillance console
+
+- Removed the in-app surveillance status/interstitial page and its route.
+- The surveillance card on the platform landing page now navigates in the same browser tab directly to `http://localhost:5175/`. Existing surveillance entry points in researcher, community, and workspace views use the same destination.
+- `npm.cmd run lint` and `npx.cmd vite build` passed with pre-existing warnings. `npm.cmd run build` remains blocked by pre-existing unused imports in analysis pages.
+- Started the surveillance Vite frontend on port 5175 for local verification; its API/model services are separate.

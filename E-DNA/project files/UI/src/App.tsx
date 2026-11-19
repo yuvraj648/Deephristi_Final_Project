@@ -23,7 +23,6 @@ import { AiAnalysisPage } from './pages/analysis/AiAnalysisPage';
 import { ComparePage } from './pages/analysis/ComparePage';
 import { ReportPage } from './pages/analysis/ReportPage';
 import { SettingsPage } from './pages/analysis/SettingsPage';
-import { SurveillanceStationPage } from './pages/SurveillanceStationPage';
 
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
@@ -39,6 +38,10 @@ const HeroPage = React.lazy(() =>
   import('./pages/HeroPage').then(({ HeroPage: page }) => ({ default: page }))
 );
 
+const navigateToSurveillance = () => {
+  window.location.assign('http://localhost:5175/');
+};
+
 type AppScreen =
   | 'hero'
   | 'landing'
@@ -49,8 +52,7 @@ type AppScreen =
   | 'data_config'
   | 'processing'
   | 'workspace'
-  | 'community'
-  | 'surveillance';
+  | 'community';
 
 const MainAppContent: React.FC = () => {
   const { expedition, setExpedition, loadExpeditionById } = useAnalysis();
@@ -145,17 +147,7 @@ const MainAppContent: React.FC = () => {
     return (
       <LandingPage
         onEnterResearcher={() => setScreen('auth')}
-        onEnterSurveillance={() => setScreen('surveillance')}
-      />
-    );
-  }
-
-  // 1b. Underwater Physical Surveillance Station (Module 02)
-  if (screen === 'surveillance') {
-    return (
-      <SurveillanceStationPage
-        onBackToLanding={() => setScreen('landing')}
-        onNavigateToResearcher={() => setScreen('auth')}
+        onEnterSurveillance={navigateToSurveillance}
       />
     );
   }
@@ -181,7 +173,7 @@ const MainAppContent: React.FC = () => {
         onOpenExpedition={handleOpenExistingExpedition}
         onNewExpedition={handleStartNewExpedition}
         onLogout={() => setScreen('landing')}
-        onOpenSurveillance={() => setScreen('surveillance')}
+        onOpenSurveillance={navigateToSurveillance}
         onOpenCommunity={() => setScreen('community')}
         researcherName={researcherUser}
       />
@@ -192,7 +184,7 @@ const MainAppContent: React.FC = () => {
     return (
       <CommunityPage
         onExit={() => setScreen('home')}
-        onOpenSurveillance={() => setScreen('surveillance')}
+        onOpenSurveillance={navigateToSurveillance}
         persistenceMode={researcherAuthMode}
       />
     );
@@ -259,7 +251,7 @@ const MainAppContent: React.FC = () => {
         currentView={workspaceView}
         onNavigate={(view) => setWorkspaceView(view as WorkspaceView)}
         onExitWorkspace={() => setScreen('home')}
-        onOpenSurveillance={() => setScreen('surveillance')}
+        onOpenSurveillance={navigateToSurveillance}
       />
 
       {/* Main Workspace Frame */}
