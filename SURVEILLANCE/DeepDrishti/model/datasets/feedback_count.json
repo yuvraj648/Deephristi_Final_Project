@@ -1,7 +1,7 @@
 {
-  "total": 5,
-  "positive": 3,
-  "negative": 2,
-  "last_finetune": null,
-  "last_finetune_weights": null
+  "total": 12,
+  "positive": 7,
+  "negative": 5,
+  "last_finetune": "2026-11-19T19:27:36.782673",
+  "last_finetune_weights": "c:\\major project folder\\Deephristi_Final_Project\\SURVEILLANCE\\DeepDrishti\\model\\models\\best_feedback.pt"
 }

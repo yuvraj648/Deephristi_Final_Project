@@ -689,3 +689,39 @@ All five local endpoints returned HTTP 200 during the verification on 2026-11-18
 2. In [Dashboard.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/pages/Dashboard.jsx#L368-L377): Corrected **View Alert History** button to `navigate('/detection-records')`.
 3. In [App.jsx](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/frontend/src/App.jsx#L38-L47): Added route alias `<Route path="/detections" ... />` in addition to `<Route path="/detection-records" ... />` so both URL paths resolve to the `DetectionRecords` page.
 4. **Verification:** Production Vite build passed in 5.50s.
+
+
+## 31. 2026-11-19 — YOLO Active Learning (HITL) fine-tuning execution on NVIDIA RTX 3050 GPU
+
+### 1. Dataset Collection Verification
+- Inspected [feedback_count.json](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/model/datasets/feedback_count.json): Confirmed **12 operator feedback samples** collected:
+  - **7 Confirmed Threats** saved in `model/datasets/positive/` with normalized bounding box `.txt` files.
+  - **5 False Positives** saved in `model/datasets/negative/` without annotations (used as background training images to suppress seabed/coral false alarms).
+
+### 2. Path Fix in `feedback.yaml`
+- Ultralytics YOLO was resolving the relative path `../datasets` against an old cached directory from `settings.json`.
+- Updated [feedback.yaml](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/model/datasets/feedback.yaml) to use the project's absolute dataset path:
+  ```yaml
+  path: "c:/major project folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/model/datasets"
+  train:
+    - positive
+    - negative
+  val:
+    - positive
+  ```
+
+### 3. Fine-Tuning Execution & Completion
+- Executed [finetune.py](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/model/scripts/finetune.py) on **NVIDIA GeForce RTX 3050 Laptop GPU (CUDA:0, 4GB VRAM)**.
+- **Training Telemetry:**
+  - Base weights: `models/best.pt` (92 layers, 25.8M parameters).
+  - Completed all 10 epochs (batch size 8, learning rate `lr0=0.0005`, box_loss 3.647, cls_loss 10.85, dfl_loss 5.114).
+  - Execution time: ~1.4 minutes on CUDA.
+  - Model weights generated:
+    - `runs/finetune/feedback_20261119_192544/weights/best.pt` (52.0 MB)
+    - Copied and persisted to [best_feedback.pt](file:///c:/major%20project%20folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/model/models/best_feedback.pt).
+- Updated `feedback_count.json` with `last_finetune: "2026-11-19T19:27:36.782673"` and `last_finetune_weights`.
+
+### 4. Service Restoration
+- Restarted Flask AI Server (Port 5001), Express Backend (Port 5003), and Vite Frontend (Port 5175).
+- Flask `/finetune/status` confirmed:
+  `{"best_feedback_available": true, "counts": {"total": 12, "positive": 7, "negative": 5}, "training_active": false}`

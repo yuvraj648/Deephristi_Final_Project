@@ -1,6 +1,9 @@
-path: ../datasets
-train: positive
-val: negative
+path: "c:/major project folder/Deephristi_Final_Project/SURVEILLANCE/DeepDrishti/model/datasets"
+train:
+  - positive
+  - negative
+val:
+  - positive
 nc: 6
 names:
   0: mine
