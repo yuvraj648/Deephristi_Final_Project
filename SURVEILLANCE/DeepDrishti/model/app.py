@@ -2,6 +2,8 @@ import os
 import sys
 import time
 import uuid
+import subprocess
+import imageio_ffmpeg
 
 # Reconfigure stdout and stderr for UTF-8 to prevent charmap crashes on Windows
 try:
@@ -372,19 +374,18 @@ def pipeline():
                     elif 'v=' in url:
                         video_id = url.split('v=')[1].split('&')[0].split('?')[0]
 
-                    if video_id:
+                    clean_url = f"https://www.youtube.com/watch?v={video_id}" if video_id else url
+                    yt_stream_url = _get_youtube_url(clean_url)
+                    if yt_stream_url:
+                        img_cv = _read_frame_from_video(yt_stream_url)
+
+                    if img_cv is None and video_id:
                         try:
                             thumb_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
-                            print(f"🖼️ Fetching YouTube frame snapshot: {thumb_url}", flush=True)
+                            print(f"🖼️ Fallback to YouTube snapshot: {thumb_url}", flush=True)
                             img_cv = _load_cv_image_from_url(thumb_url)
                         except Exception as e:
-                            print(f"⚠️ Snapshot fetch failed, attempting stream: {e}", flush=True)
-
-                    if img_cv is None:
-                        clean_url = f"https://www.youtube.com/watch?v={video_id}" if video_id else url
-                        yt_stream_url = _get_youtube_url(clean_url)
-                        if yt_stream_url:
-                            img_cv = _read_frame_from_video(yt_stream_url)
+                            print(f"⚠️ Snapshot fetch failed: {e}", flush=True)
                 
                 if img_cv is None and _is_probably_video_source(url):
                     print(f"🌐 Opening direct video stream: {url}", flush=True)
@@ -696,25 +697,43 @@ def render_video():
         if video_path and os.path.exists(video_path):
             input_video_path = video_path
         elif url:
-            possible = [
-                os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'public', url.lstrip('/'))),
-                os.path.abspath(os.path.join(os.getcwd(), '..', 'frontend', 'public', url.lstrip('/'))),
-                url
-            ]
-            for p in possible:
-                if os.path.exists(p):
-                    input_video_path = p
-                    break
+            if any(k in str(url) for k in ['youtube.com', 'youtu.be']):
+                print(f"📺 Extracting YouTube stream for batch render: {url}", flush=True)
+                video_id = None
+                if '/embed/' in url:
+                    video_id = url.split('/embed/')[1].split('?')[0].split('&')[0]
+                elif '/live/' in url:
+                    video_id = url.split('/live/')[1].split('?')[0].split('&')[0]
+                elif 'youtu.be/' in url:
+                    video_id = url.split('youtu.be/')[1].split('?')[0].split('&')[0]
+                elif 'v=' in url:
+                    video_id = url.split('v=')[1].split('&')[0].split('?')[0]
+                clean_url = f"https://www.youtube.com/watch?v={video_id}" if video_id else url
+                input_video_path = _get_youtube_url(clean_url)
+            else:
+                possible = [
+                    os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'public', url.lstrip('/'))),
+                    os.path.abspath(os.path.join(os.getcwd(), '..', 'frontend', 'public', url.lstrip('/'))),
+                    url
+                ]
+                for p in possible:
+                    if os.path.exists(p):
+                        input_video_path = p
+                        break
 
-    if not input_video_path or not os.path.exists(input_video_path):
-        return jsonify({"error": "No valid video file provided"}), 400
+    if not input_video_path or (not str(input_video_path).startswith('http') and not os.path.exists(input_video_path)):
+        return jsonify({"error": "No valid video file or stream provided"}), 400
 
     cap = cv2.VideoCapture(input_video_path)
     if not cap.isOpened():
-        return jsonify({"error": "Failed to open video file"}), 400
+        return jsonify({"error": "Failed to open video source"}), 400
 
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 100
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if total_frames <= 0 or total_frames > 100000:
+        total_frames = 150  # Default cap for live streams
     orig_fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    if orig_fps <= 0 or orig_fps > 120:
+        orig_fps = 25.0
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 640
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 480
 
@@ -722,9 +741,10 @@ def render_video():
     timestamp = int(time.time())
     out_filename = f"rendered_tactical_{timestamp}_{unique_token}.mp4"
     out_path = os.path.join(OUTPUT_FOLDER, out_filename)
+    raw_path = os.path.join(OUTPUT_FOLDER, f"temp_raw_{out_filename}")
 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out_writer = cv2.VideoWriter(out_path, fourcc, orig_fps, (width, height))
+    out_writer = cv2.VideoWriter(raw_path, fourcc, orig_fps, (width, height))
 
     frame_idx = 0
     total_detections_count = 0
@@ -758,6 +778,31 @@ def render_video():
 
     cap.release()
     out_writer.release()
+
+    # Transcode to web-standard H.264 (yuv420p) with faststart MP4 header for seamless Chrome playback
+    transcode_success = False
+    try:
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+        cmd = [
+            ffmpeg_exe, "-y",
+            "-i", raw_path,
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
+            "-preset", "veryfast",
+            out_path
+        ]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if res.returncode == 0 and os.path.exists(out_path):
+            transcode_success = True
+            if os.path.exists(raw_path):
+                os.remove(raw_path)
+    except Exception as e:
+        print(f"⚠️ H.264 transcode error: {e}", flush=True)
+
+    if not transcode_success:
+        if os.path.exists(raw_path):
+            os.replace(raw_path, out_path)
 
     if temp_input and os.path.exists(input_video_path):
         try: os.remove(input_video_path)

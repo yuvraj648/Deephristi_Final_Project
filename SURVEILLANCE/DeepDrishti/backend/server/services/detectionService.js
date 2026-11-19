@@ -172,12 +172,6 @@ class DetectionService {
   // Send frame data to Flask detection API
   async sendToFlaskAPI(frameData) {
     try {
-      const urlStr = String(frameData?.frameUrl || '');
-      // If remote YouTube URL, use simulated detection telemetry to avoid blocking Flask ML workers
-      if (urlStr.includes('youtube.com') || urlStr.includes('youtu.be')) {
-        return this.simulateDetection(frameData);
-      }
-
       console.log(`📡 Sending ${frameData.frameUrl || 'image'} to Flask pipeline...`);
       let stationThreshold = 0.50;
       try {

@@ -506,3 +506,32 @@ All five local endpoints returned HTTP 200 during the verification on 2026-11-18
 - Frontend build (`npx vite build`): **Pass in 5.02s**.
 - Backend syntax check (`node --check`): **Pass**.
 - Live GPU benchmark: **272.47 ms response on CUDA**.
+
+## 24. 2026-11-19 — Option B H.264 video playback fix & real-time YouTube model pipeline enablement
+
+### 1. Root Cause & Solution for Option B Rendered Video Not Playing in Chrome
+- **Symptom:** Rendered video opened in Google Chrome (`http://localhost:5001/outputs/rendered_tactical_*.mp4`) displayed a black/gray box stuck at `0:00` and failed to start playback.
+- **Root Cause:** OpenCV's `cv2.VideoWriter(..., cv2.VideoWriter_fourcc(*'mp4v'), ...)` writes video using the legacy MPEG-4 Part 2 codec. HTML5 video players in modern web browsers (Chrome, Edge, Safari) strictly reject `mp4v` and require **H.264 (AVC1)** with progressive **`yuv420p`** pixel format and a faststart MP4 atom (`moov` atom at the file beginning).
+- **Fix Implemented:**
+  - Integrated `imageio-ffmpeg` directly inside `SURVEILLANCE/DeepDrishti/model/app.py`.
+  - In `render_video()`, the raw OpenCV output is now written to a temporary raw buffer (`temp_raw_<filename>.mp4`).
+  - Upon completion of frame rendering, the pipeline invokes the bundled FFmpeg binary to transcode the video:
+    `ffmpeg -y -i <raw> -c:v libx264 -pix_fmt yuv420p -movflags +faststart -preset veryfast <out_path>`
+  - Transcoding automatically removes the temporary raw file and places the web-standard H.264 MP4 at `outputs/`.
+  - If the user reloads their existing tab `localhost:5001/outputs/rendered_tactical_1795077537_7ee24ae3.mp4`, it has been transcoded to H.264 and plays immediately.
+  - Tested batch video render of `feed-local-a.mp4`: processed 201 frames in 6.2 seconds on NVIDIA RTX 3050 (32.4 FPS), output confirmed H.264 `yuv420p` 30 FPS.
+
+### 2. Can We Apply AI Models on YouTube Video in the Surveillance Section?
+- **Analysis:**
+  - **Browser limitation:** Web browser JavaScript (`<canvas>` API) is strictly blocked by browser Cross-Origin Security Policies (CORS / Same-Origin Policy) from extracting frames out of an external YouTube `<iframe>`.
+  - **Backend Solution:** The Python AI backend has full network capability. Using `yt-dlp`, Python extracts the direct 720p HLS/DASH video stream URL from YouTube (`https://www.youtube.com/watch?v=...`), and OpenCV reads live frames directly from the stream in memory.
+  - **Previous blocker found in codebase:** In `SURVEILLANCE/DeepDrishti/backend/server/services/detectionService.js`, lines 177-179 had a mock bypass: `if (urlStr.includes('youtube.com')) return this.simulateDetection(frameData);`. This was intercepting YouTube feeds and returning fake telemetry.
+- **Fix & Enhancements Implemented:**
+  1. Removed the simulation bypass in `detectionService.js` so YouTube feed frames are transmitted to Flask `/pipeline`.
+  2. Updated `SURVEILLANCE/DeepDrishti/model/app.py`:
+     - Prioritized direct YouTube stream extraction via `_get_youtube_url(clean_url)` and `_read_frame_from_video(yt_stream_url)`.
+     - Static thumbnail snapshot is now only used as an emergency fallback if the live stream is completely unreachable.
+     - Added full YouTube video stream support to `POST /render-video` so entire YouTube video clips can be processed and rendered as tactical MP4s.
+  3. **Verification:**
+     - Tested `POST /pipeline` on active YouTube stream (`https://www.youtube.com/watch?v=jzx_n25g3kA`): successfully extracted live frame, ran FUNIE-GAN (PSNR 23.67 dB, SSIM 0.632, UIQM 0.851), MiDaS depth estimation (`OPERATIONAL`, avg 11.0m), and YOLOv8 on RTX 3050 CUDA.
+     - Tested `POST /render-video` on active YouTube stream: extracted and processed 150 frames in 14.9 seconds on CUDA (248 detections), outputted clean H.264 MP4 file.
