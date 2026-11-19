@@ -22,6 +22,7 @@ import {
   Anchor,
   Navigation,
   Waves,
+  MapPin,
 } from 'lucide-react';
 
 type LayerKey = 'esriOcean' | 'noaaGebco' | 'googleHybrid' | 'googleTerrain' | 'osm';
@@ -109,6 +110,57 @@ function getRampColor(ratio: number): string {
   return OCEAN_RAMP[idx];
 }
 
+const createTeardropPin = (
+  number: number | string,
+  color: string,
+  isSelected: boolean
+) => {
+  const ringColor = isSelected ? '#FFFFFF' : '#38BDF8';
+  const shadow = isSelected ? '0 0 20px #38BDF8, 0 0 10px #0284C7' : `0 0 12px ${color}99`;
+  return L.divIcon({
+    className: 'custom-station-pin',
+    iconSize: [32, 40],
+    iconAnchor: [16, 40],
+    popupAnchor: [0, -38],
+    html: `
+      <div style="
+        position: relative;
+        width: 32px;
+        height: 40px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        filter: drop-shadow(${shadow});
+        cursor: pointer;
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        transform: ${isSelected ? 'scale(1.22)' : 'scale(1)'};
+      ">
+        <div style="
+          width: 28px;
+          height: 28px;
+          background: ${color};
+          border: 2px solid ${ringColor};
+          border-radius: 50% 50% 50% 0;
+          transform: rotate(-45deg);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+        ">
+          <span style="
+            transform: rotate(45deg);
+            color: #FFFFFF;
+            font-size: 11px;
+            font-weight: 800;
+            font-family: monospace;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.85);
+          ">${number}</span>
+        </div>
+      </div>
+    `,
+  });
+};
+
 interface LeafletBiodiversityMapProps {
   height?: string;
   selectedMetric: MapMetricType;
@@ -135,6 +187,17 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
   const [liveCoords, setLiveCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showTransect, setShowTransect] = useState(true);
+  const [stationResolution, setStationResolution] = useState<'primary3' | 'all21'>('primary3');
+
+  // Allow popups to trigger expanding to all 21 stations
+  useEffect(() => {
+    (window as any).__deepdrishti_show_all_stations = () => {
+      setStationResolution('all21');
+    };
+    return () => {
+      delete (window as any).__deepdrishti_show_all_stations;
+    };
+  }, []);
 
   // Filter sites with coordinates or provide automatic regional transect positioning
   const displaySites = useMemo(() => {
@@ -175,9 +238,81 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
     });
   }, [siteProfiles, expedition]);
 
+  // 3 Primary Regional Stations (grouped from all transect stations)
+  const primarySites = useMemo(() => {
+    if (displaySites.length === 0) return [];
+    if (displaySites.length <= 3) {
+      return displaySites.map((s, i) => ({
+        ...s,
+        primaryPinNumber: i + 1,
+        subSiteCount: 1,
+        firstSubSite: s.site,
+      }));
+    }
+
+    const count = displaySites.length;
+    const chunk1End = Math.ceil(count / 3);
+    const chunk2End = Math.ceil((2 * count) / 3);
+
+    const chunk1 = displaySites.slice(0, chunk1End);
+    const chunk2 = displaySites.slice(chunk1End, chunk2End);
+    const chunk3 = displaySites.slice(chunk2End);
+
+    const chunks = [
+      { name: 'Station S01 - Coastal Reef / Shelf', sites: chunk1, pinNum: 1 },
+      { name: 'Station S02 - Continental Shelf Break', sites: chunk2, pinNum: 2 },
+      { name: 'Station S03 - Bathyal Basin Margin', sites: chunk3, pinNum: 3 },
+    ];
+
+    return chunks.map((c) => {
+      const midIdx = Math.floor(c.sites.length / 2);
+      const repSite = c.sites[midIdx] || c.sites[0];
+
+      const totalReads = c.sites.reduce((acc, s) => acc + s.totalAbundance, 0);
+      const allDepths = Array.from(new Set(c.sites.flatMap((s) => s.depths))).sort((a, b) => a - b);
+      const avgShannon = Number((c.sites.reduce((acc, s) => acc + s.shannon, 0) / c.sites.length).toFixed(2));
+      const avgSimpson = Number((c.sites.reduce((acc, s) => acc + s.simpson, 0) / c.sites.length).toFixed(2));
+      const totalTaxa = Math.max(...c.sites.map((s) => s.taxaCount));
+      const totalAsvs = c.sites.reduce((acc, s) => acc + s.asvCount, 0);
+      const totalDivergent = c.sites.reduce((acc, s) => acc + s.divergentGroupCount, 0);
+
+      const taxaMap = new Map<string, number>();
+      c.sites.forEach((s) => {
+        s.dominantTaxa.forEach((dt) => {
+          taxaMap.set(dt.taxon, (taxaMap.get(dt.taxon) || 0) + dt.percentage);
+        });
+      });
+      const dominantTaxa = Array.from(taxaMap.entries())
+        .map(([taxon, sum]) => ({ taxon, percentage: Math.round(sum / c.sites.length) }))
+        .sort((a, b) => b.percentage - a.percentage)
+        .slice(0, 5);
+
+      return {
+        site: c.name,
+        latitude: repSite.latitude,
+        longitude: repSite.longitude,
+        depths: allDepths,
+        asvCount: totalAsvs,
+        taxaCount: totalTaxa,
+        totalAbundance: totalReads,
+        shannon: avgShannon,
+        simpson: avgSimpson,
+        dominantTaxa,
+        divergentGroupCount: totalDivergent,
+        primaryPinNumber: c.pinNum,
+        subSiteCount: c.sites.length,
+        firstSubSite: c.sites[0]?.site,
+      };
+    });
+  }, [displaySites]);
+
+  const activeSitesToRender = useMemo(() => {
+    return stationResolution === 'primary3' ? primarySites : displaySites;
+  }, [stationResolution, primarySites, displaySites]);
+
   // Compute metric values
   const metricValues = useMemo(() => {
-    return displaySites.map((s) => {
+    return activeSitesToRender.map((s) => {
       let v = 0;
       if (selectedMetric === 'taxaRichness') v = s.taxaCount;
       else if (selectedMetric === 'shannon') v = s.shannon;
@@ -187,7 +322,7 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
       else if (selectedMetric === 'divergent') v = s.divergentGroupCount;
       return { site: s.site, val: v };
     });
-  }, [displaySites, selectedMetric]);
+  }, [activeSitesToRender, selectedMetric]);
 
   const maxVal = Math.max(...metricValues.map((m) => m.val), 1);
   const minVal = Math.min(...metricValues.map((m) => m.val), 0);
@@ -321,7 +456,7 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
 
     const latlngs: [number, number][] = [];
 
-    displaySites.forEach((site, index) => {
+    activeSitesToRender.forEach((site: any, index: number) => {
       const lat = site.latitude!;
       const lng = site.longitude!;
       latlngs.push([lat, lng]);
@@ -332,18 +467,18 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
       const color = selectedMetric === 'divergent'
         ? (val > 0 ? '#C084FC' : '#1E3550')
         : getRampColor(ratio);
-      const radius = 10 + ratio * 16;
-      const isSelected = selectedSiteId === site.site || selectedSiteId === site.site.split(' - ')[0];
 
-      // Proportional Circle Marker with Station Pin Visuals
-      const marker = L.circleMarker([lat, lng], {
-        radius: isSelected ? radius + 5 : radius,
-        fillColor: color,
-        color: isSelected ? '#FFFFFF' : '#040910',
-        weight: isSelected ? 3 : 1.5,
-        fillOpacity: isSelected ? 1 : 0.88,
-        opacity: 1,
-        className: 'leaflet-bio-marker cursor-pointer',
+      const isSelected = selectedSiteId === site.site ||
+        selectedSiteId === site.site.split(' - ')[0] ||
+        (site.firstSubSite && selectedSiteId === site.firstSubSite);
+
+      const pinNumber = site.primaryPinNumber !== undefined ? site.primaryPinNumber : index + 1;
+
+      // Teardrop Marker with Station Pin Visuals and Dynamic Metric Color
+      const marker = L.marker([lat, lng], {
+        icon: createTeardropPin(pinNumber, color, isSelected),
+        title: site.site,
+        zIndexOffset: isSelected ? 1000 : 100,
       });
 
       const valLabel =
@@ -351,9 +486,11 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
           ? val.toFixed(2)
           : val.toLocaleString();
 
+      const isPrimary = stationResolution === 'primary3';
+
       const popupHtml = `
-        <div style="font-family:monospace;font-size:12px;color:#060B13;padding:4px;min-width:180px;">
-          <div style="font-weight:700;font-size:13px;border-bottom:1px solid #CBD5E1;padding-bottom:4px;margin-bottom:6px;color:#0F172A;">
+        <div style="font-family:monospace;font-size:12px;color:#060B13;padding:6px;min-width:210px;">
+          <div style="font-weight:700;font-size:13px;border-bottom:1px solid #CBD5E1;padding-bottom:4px;margin-bottom:6px;color:#0284C7;">
             📍 ${site.site}
           </div>
           <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
@@ -376,24 +513,45 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
             <span style="color:#64748B;">Reads:</span>
             <span style="font-weight:600;">${site.totalAbundance.toLocaleString()}</span>
           </div>
-          <div style="font-size:10px;text-align:center;color:#0284C7;background:#F0F9FF;padding:4px;border-radius:4px;border:1px solid #BAE6FD;">
-            Click to inspect biological dossier →
-          </div>
+          ${isPrimary ? `
+            <div style="margin-top:6px;padding-top:6px;border-top:1px dashed #CBD5E1;text-align:center;">
+              <div style="font-size:10px;color:#64748B;margin-bottom:4px;">Sector contains ${site.subSiteCount || 7} sub-stations along transect</div>
+              <button onclick="window.__deepdrishti_show_all_stations && window.__deepdrishti_show_all_stations()" style="
+                width:100%;
+                padding:5px 8px;
+                background:#0284C7;
+                color:white;
+                border:none;
+                border-radius:4px;
+                cursor:pointer;
+                font-family:monospace;
+                font-size:11px;
+                font-weight:bold;
+              ">
+                Expand Detailed Transect (21) →
+              </button>
+            </div>
+          ` : `
+            <div style="font-size:10px;text-align:center;color:#0284C7;background:#F0F9FF;padding:4px;border-radius:4px;border:1px solid #BAE6FD;">
+              Click to inspect biological dossier →
+            </div>
+          `}
         </div>
       `;
 
-      marker.bindPopup(popupHtml, { maxWidth: 240 });
+      marker.bindPopup(popupHtml, { maxWidth: 260 });
 
       // Station number tooltip
-      marker.bindTooltip(`Station ${index + 1}: ${site.site.split(' - ')[0]} (${valLabel})`, {
+      marker.bindTooltip(`Station ${pinNumber}: ${site.site.split(' - ')[0]} (${valLabel})`, {
         permanent: false,
         direction: 'top',
         className: 'leaflet-bio-tooltip',
       });
 
       marker.on('click', () => {
-        setSelectedSiteId(site.site);
-        setActiveDrawer({ type: 'site', id: site.site });
+        const targetSite = site.firstSubSite || site.site;
+        setSelectedSiteId(targetSite);
+        setActiveDrawer({ type: 'site', id: targetSite });
       });
 
       mg.addLayer(marker);
@@ -405,7 +563,7 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
     } else {
       polyline.setLatLngs([]);
     }
-  }, [displaySites, metricValues, selectedSiteId, selectedMetric, showTransect, setSelectedSiteId, setActiveDrawer, maxVal, minVal]);
+  }, [activeSitesToRender, metricValues, selectedSiteId, selectedMetric, showTransect, setSelectedSiteId, setActiveDrawer, maxVal, minVal, stationResolution]);
 
   // Recenter handler
   const handleRecenter = useCallback(() => {
@@ -432,57 +590,92 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
     >
       {/* Top Map Control Strip */}
       <div className="relative z-[500] flex flex-wrap items-center justify-between px-3 py-2 bg-[#060B13]/95 border-b border-rule text-[11px] font-mono gap-2">
-        {/* Left: Layer Selector & Toggles */}
-        <div className="flex items-center gap-2">
-          {/* Layer Menu Trigger */}
-          <div className="relative">
+        {/* Left: Station Resolution & Direct Basemap Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Station Resolution Toggle: 3 Primary vs Detailed 21 */}
+          <div className="flex items-center gap-0.5 bg-paper/20 p-0.5 rounded-control border border-rule">
             <button
               type="button"
-              onClick={() => setShowLayerMenu((v) => !v)}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-paper/15 border border-rule hover:border-survey text-ink rounded-control transition-colors"
+              onClick={() => setStationResolution('primary3')}
+              className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors flex items-center gap-1.5 ${
+                stationResolution === 'primary3'
+                  ? 'bg-survey text-white font-medium shadow-sm'
+                  : 'text-ink-muted hover:text-ink hover:bg-paper-sunk'
+              }`}
+              title="Show 3 Primary Survey Stations"
             >
-              <Layers size={13} className="text-survey" />
-              <span className="font-medium max-w-[170px] truncate">{LAYERS[activeLayer].name}</span>
-              <span className="text-[10px] text-ink-faint">▾</span>
+              <MapPin size={11} className={stationResolution === 'primary3' ? 'text-white' : 'text-survey'} />
+              <span>3 Primary Stations</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setStationResolution('all21')}
+              className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors flex items-center gap-1.5 ${
+                stationResolution === 'all21'
+                  ? 'bg-survey text-white font-medium shadow-sm'
+                  : 'text-ink-muted hover:text-ink hover:bg-paper-sunk'
+              }`}
+              title="Show all 21 hydrographic transect stations"
+            >
+              <Navigation size={11} className={stationResolution === 'all21' ? 'text-white' : 'text-survey'} />
+              <span>Transect (21 Stations)</span>
+            </button>
+          </div>
 
-            {/* Layer Dropdown */}
-            {showLayerMenu && (
-              <div className="absolute top-full left-0 mt-1 w-80 bg-[#060B13] border border-rule-strong rounded-plate shadow-floating z-[1000] overflow-hidden">
-                <div className="px-3 py-2 border-b border-rule bg-paper-sunk text-[10px] uppercase tracking-wider text-ink-faint">
-                  Select Oceanic / Bathymetric Basemap
-                </div>
-                {(Object.keys(LAYERS) as LayerKey[]).map((key) => {
-                  const cfg = LAYERS[key];
-                  const isCur = activeLayer === key;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => {
-                        setActiveLayer(key);
-                        setShowLayerMenu(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 border-b border-rule/30 transition-colors flex items-start justify-between gap-2 ${
-                        isCur ? 'bg-survey/15 border-l-2 border-l-survey' : 'hover:bg-paper/10'
-                      }`}
-                    >
-                      <div>
-                        <div className={`font-mono text-[12px] font-medium ${isCur ? 'text-survey' : 'text-ink'}`}>
-                          {cfg.name}
-                        </div>
-                        <div className="text-[10px] text-ink-muted leading-tight mt-0.5 line-clamp-1">
-                          {cfg.description}
-                        </div>
-                      </div>
-                      <span className="text-[9px] font-mono text-ink-faint uppercase px-1.5 py-0.5 rounded bg-paper-sunk whitespace-nowrap mt-0.5">
-                        {cfg.badge}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+          {/* Direct Basemap Switcher Buttons */}
+          <div className="flex items-center gap-0.5 bg-paper/20 p-0.5 rounded-control border border-rule">
+            <button
+              type="button"
+              onClick={() => setActiveLayer('esriOcean')}
+              className={`px-2 py-1 rounded text-[11px] font-mono transition-colors flex items-center gap-1 ${
+                activeLayer === 'esriOcean'
+                  ? 'bg-survey text-white font-medium shadow-sm'
+                  : 'text-ink-muted hover:text-ink hover:bg-paper-sunk'
+              }`}
+              title="Nautical Dark Hydrographic Chart"
+            >
+              <Compass size={11} />
+              <span>Tactical Chart</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveLayer('noaaGebco')}
+              className={`px-2 py-1 rounded text-[11px] font-mono transition-colors flex items-center gap-1 ${
+                activeLayer === 'noaaGebco'
+                  ? 'bg-survey text-white font-medium shadow-sm'
+                  : 'text-ink-muted hover:text-ink hover:bg-paper-sunk'
+              }`}
+              title="NOAA NCEI Bathymetric Depth Relief"
+            >
+              <Waves size={11} />
+              <span>NOAA Bathymetry</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveLayer('googleHybrid')}
+              className={`px-2 py-1 rounded text-[11px] font-mono transition-colors flex items-center gap-1 ${
+                activeLayer === 'googleHybrid'
+                  ? 'bg-survey text-white font-medium shadow-sm'
+                  : 'text-ink-muted hover:text-ink hover:bg-paper-sunk'
+              }`}
+              title="Google Optical Satellite Imagery"
+            >
+              <Layers size={11} />
+              <span>Google Satellite</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveLayer('googleTerrain')}
+              className={`px-2 py-1 rounded text-[11px] font-mono transition-colors flex items-center gap-1 ${
+                activeLayer === 'googleTerrain'
+                  ? 'bg-survey text-white font-medium shadow-sm'
+                  : 'text-ink-muted hover:text-ink hover:bg-paper-sunk'
+              }`}
+              title="Google Physical Ocean & Terrain"
+            >
+              <Anchor size={11} />
+              <span>Terrain</span>
+            </button>
           </div>
 
           {/* Transect line toggle */}
@@ -494,9 +687,10 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
                 ? 'bg-survey/20 border-survey text-survey'
                 : 'bg-paper/10 border-rule text-ink-faint hover:text-ink'
             }`}
+            title="Toggle Cruise Transect Route Line"
           >
             <Navigation size={11} />
-            <span>Transect</span>
+            <span>Route</span>
           </button>
 
           {/* Recenter Button */}
@@ -521,7 +715,7 @@ export const LeafletBiodiversityMap: React.FC<LeafletBiodiversityMapProps> = ({
                 key={p.name}
                 type="button"
                 onClick={() => handleJumpToPreset(p.lat, p.lng, p.zoom)}
-                className="px-1.5 py-0.5 rounded bg-paper/10 hover:bg-survey/20 hover:text-survey text-ink-muted transition-colors truncate max-w-[90px]"
+                className="px-1.5 py-0.5 rounded bg-paper/10 hover:bg-survey/20 hover:text-survey text-ink-muted transition-colors truncate max-w-[80px]"
                 title={p.name}
               >
                 {p.name.split(' ')[0]}

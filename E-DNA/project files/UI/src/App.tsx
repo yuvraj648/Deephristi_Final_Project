@@ -224,9 +224,10 @@ const MainAppContent: React.FC = () => {
         isAsvData={true}
         isDemoMode={!stagedExpeditionToSave && expedition.provenance === 'demo'}
         expeditionToSave={stagedExpeditionToSave}
-        onComplete={() => {
-          if (stagedExpeditionToSave) {
-            setExpedition(stagedExpeditionToSave);
+        onComplete={(savedExpedition) => {
+          const finalExp = savedExpedition || stagedExpeditionToSave;
+          if (finalExp) {
+            setExpedition(finalExp);
             setStagedExpeditionToSave(null);
           }
           handleProcessingComplete();

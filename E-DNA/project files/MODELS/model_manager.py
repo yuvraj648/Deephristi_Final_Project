@@ -16,6 +16,95 @@ BASES = "ACGT"
 K_MERS_64 = ["".join(x) for x in product(BASES, repeat=3)]
 KMER_INDEX = {kmer: i for i, kmer in enumerate(K_MERS_64)}
 
+KINGDOM_MAPPING = {
+    # Metazoan animal phyla
+    "Arthropoda": ("Eukaryota", "Metazoa"),
+    "Mollusca": ("Eukaryota", "Metazoa"),
+    "Annelida": ("Eukaryota", "Metazoa"),
+    "Cnidaria": ("Eukaryota", "Metazoa"),
+    "Metazoa": ("Eukaryota", "Metazoa"),
+    "Chordata": ("Eukaryota", "Metazoa"),
+    "Porifera": ("Eukaryota", "Metazoa"),
+    "Echinodermata": ("Eukaryota", "Metazoa"),
+    "Ctenophora": ("Eukaryota", "Metazoa"),
+    "Nemertea": ("Eukaryota", "Metazoa"),
+    "Bryozoa": ("Eukaryota", "Metazoa"),
+    "Platyhelminthes": ("Eukaryota", "Metazoa"),
+    "Rotifera": ("Eukaryota", "Metazoa"),
+    "Chaetognatha": ("Eukaryota", "Metazoa"),
+    "Hemichordata": ("Eukaryota", "Metazoa"),
+    # Protist / Chromist / Algal phyla
+    "Bacillariophyta": ("Eukaryota", "Chromista"),
+    "Chlorophyta": ("Eukaryota", "Plantae"),
+    "Chlorophyta:plas": ("Eukaryota", "Plantae"),
+    "Streptophyta": ("Eukaryota", "Plantae"),
+    "Rhodophyta": ("Eukaryota", "Plantae"),
+    "Prasinodermophyta": ("Eukaryota", "Plantae"),
+    "Ciliophora": ("Eukaryota", "Chromista"),
+    "Apicomplexa": ("Eukaryota", "Chromista"),
+    "Cercozoa": ("Eukaryota", "Chromista"),
+    "Cryptophyta": ("Eukaryota", "Chromista"),
+    "Dinoflagellata": ("Eukaryota", "Chromista"),
+    "Ochrophyta": ("Eukaryota", "Chromista"),
+    "Ochrophyta:plas": ("Eukaryota", "Chromista"),
+    "Haptophyta": ("Eukaryota", "Chromista"),
+    "Haptophyta:plas": ("Eukaryota", "Chromista"),
+    "Radiolaria": ("Eukaryota", "Chromista"),
+    "Foraminifera": ("Eukaryota", "Chromista"),
+    "Picozoa": ("Eukaryota", "Chromista"),
+    "Opalozoa": ("Eukaryota", "Chromista"),
+    "Sagenista": ("Eukaryota", "Chromista"),
+    "Stramenopiles_X": ("Eukaryota", "Chromista"),
+    "Discoba": ("Eukaryota", "Excavata"),
+    "Conosa": ("Eukaryota", "Amoebozoa"),
+    "Lobosa": ("Eukaryota", "Amoebozoa"),
+    "Hilomonadea": ("Eukaryota", "Chromista"),
+    "Katablepharidophyta": ("Eukaryota", "Chromista"),
+    "Telonemia": ("Eukaryota", "Chromista"),
+    "Centroheliozoa": ("Eukaryota", "Chromista"),
+    "Choanoflagellida": ("Eukaryota", "Opisthokonta"),
+    "Mesomycetozoa": ("Eukaryota", "Opisthokonta"),
+    "Opisthokonta_X": ("Eukaryota", "Opisthokonta"),
+    # Fungi
+    "Ascomycota": ("Eukaryota", "Fungi"),
+    "Basidiomycota": ("Eukaryota", "Fungi"),
+    "Fungi": ("Eukaryota", "Fungi"),
+    "Pseudofungi": ("Eukaryota", "Chromista"),
+    # Bacteria
+    "Proteobacteria": ("Bacteria", "Proteobacteria"),
+    "Acidobacteria": ("Bacteria", "Acidobacteria"),
+    "Firmicutes": ("Bacteria", "Firmicutes"),
+    "Nitrospinae": ("Bacteria", "Nitrospinae"),
+    "Planctomycetes": ("Bacteria", "Planctomycetes"),
+    "Verrucomicrobia": ("Bacteria", "Verrucomicrobia"),
+    "Epsilonbacteraeota": ("Bacteria", "Epsilonbacteraeota"),
+    # Archaea
+    "Thaumarchaeota": ("Archaea", "Thaumarchaeota"),
+    "Euryarchaeota": ("Archaea", "Euryarchaeota"),
+}
+
+COI_CLASS_MAPPING = {
+    "Copepoda": {"kingdom": "Eukaryota", "phylum": "Arthropoda", "class": "Hexanauplia"},
+    "Arachnida": {"kingdom": "Eukaryota", "phylum": "Arthropoda", "class": "Arachnida"},
+    "Gastropoda": {"kingdom": "Eukaryota", "phylum": "Mollusca", "class": "Gastropoda"},
+    "Hydrozoa": {"kingdom": "Eukaryota", "phylum": "Cnidaria", "class": "Hydrozoa"},
+    "Demospongiae": {"kingdom": "Eukaryota", "phylum": "Porifera", "class": "Demospongiae"},
+    "Mammalia": {"kingdom": "Eukaryota", "phylum": "Chordata", "class": "Mammalia"},
+    "Bacillariophyceae": {"kingdom": "Eukaryota", "phylum": "Bacillariophyta", "class": "Bacillariophyceae"},
+    "Dinophyceae": {"kingdom": "Eukaryota", "phylum": "Dinoflagellata", "class": "Dinophyceae"},
+    "Phaeophyceae": {"kingdom": "Eukaryota", "phylum": "Ochrophyta", "class": "Phaeophyceae"},
+    "Pelagophyceae": {"kingdom": "Eukaryota", "phylum": "Ochrophyta", "class": "Pelagophyceae"},
+    "Dictyochophyceae": {"kingdom": "Eukaryota", "phylum": "Ochrophyta", "class": "Dictyochophyceae"},
+    "Peronosporea": {"kingdom": "Eukaryota", "phylum": "Ochrophyta", "class": "Peronosporea"},
+    "Coccolithophyceae": {"kingdom": "Eukaryota", "phylum": "Haptophyta", "class": "Coccolithophyceae"},
+    "Florideophyceae": {"kingdom": "Eukaryota", "phylum": "Rhodophyta", "class": "Florideophyceae"},
+    "Mamiellophyceae": {"kingdom": "Eukaryota", "phylum": "Chlorophyta", "class": "Mamiellophyceae"},
+    "Dothideomycetes": {"kingdom": "Eukaryota", "phylum": "Ascomycota", "class": "Dothideomycetes"},
+    "Eurotiomycetes": {"kingdom": "Eukaryota", "phylum": "Ascomycota", "class": "Eurotiomycetes"},
+    "Discosea": {"kingdom": "Eukaryota", "phylum": "Amoebozoa", "class": "Discosea"},
+    "Alphaproteobacteria": {"kingdom": "Bacteria", "phylum": "Proteobacteria", "class": "Alphaproteobacteria"},
+}
+
 def clean_sequence(raw_sequence: str) -> str:
     """Sanitize input DNA sequence to uppercase canonical and ambiguous bases."""
     sequence = (raw_sequence or "").strip().upper()
@@ -69,7 +158,27 @@ class ModelManager:
         self.dnabert_model = None
         self.dnabert_classes = []
 
+        # Verified Marine Reference Catalog
+        self.reference_catalog = {}
+        self._load_reference_catalog()
+
         self.load_all_models()
+
+    def _load_reference_catalog(self):
+        try:
+            db_json = os.path.join(BASE_DIR, "database.json")
+            if os.path.exists(db_json):
+                with open(db_json, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                for exp in data:
+                    for asv in exp.get("asvs", []):
+                        seq = clean_sequence(asv.get("sequence", ""))
+                        tax = asv.get("taxonomy")
+                        if seq and tax and seq not in self.reference_catalog:
+                            self.reference_catalog[seq] = tax
+                print(f"[ModelManager] Loaded {len(self.reference_catalog)} reference lineages into catalog.")
+        except Exception as e:
+            print(f"[ModelManager] Warning: could not load reference catalog: {e}")
 
     def load_all_models(self):
         self._load_deepdrishti_cnn()
@@ -419,8 +528,83 @@ class ModelManager:
         elif target in ["tara_dnabert2", "dnabert", "dnabert2", "model3", "3"]:
             return self.predict_dnabert2(sequence)
         else:
-            # Fallback to CNN
-            return self.predict_cnn(sequence)
+            raise ValueError(f"Invalid model ID '{model_id}'. Valid selections are: 'deepdrishti_cnn', 'coi_xgboost', 'tara_dnabert2', or 'all'.")
+
+    def resolve_taxonomy(self, sequence: str, model_id: Optional[str] = "deepdrishti_cnn") -> Dict[str, Any]:
+        """Classify sequence into full 7-level Linnaean hierarchy with confidence and novelty."""
+        clean_seq = clean_sequence(sequence)
+        if len(clean_seq) == 0:
+            return {
+                "taxonomy": {
+                    "kingdom": "unassigned",
+                    "phylum": "unassigned",
+                    "class": "unassigned",
+                    "order": "unassigned",
+                    "family": "unassigned",
+                    "genus": "unassigned",
+                    "species": "unassigned"
+                },
+                "confidence": 0.0,
+                "assignment_status": "unassigned",
+                "novelty_status": "not_evaluated"
+            }
+
+        # 1. Exact sequence match in verified reference catalog
+        if clean_seq in self.reference_catalog:
+            ref_tax = dict(self.reference_catalog[clean_seq])
+            return {
+                "taxonomy": ref_tax,
+                "confidence": 0.98,
+                "assignment_status": "assigned" if ref_tax.get("phylum") and ref_tax.get("phylum") != "unassigned" else "low_confidence",
+                "novelty_status": "cataloged",
+                "source": "reference_catalog",
+                "predicted_phylum": ref_tax.get("phylum", "unassigned")
+            }
+
+        # 2. Predictive ML inference on raw sequence
+        res = self.predict(clean_seq, model_id)
+        pred_taxon = res.get("predicted_taxon") or res.get("predicted_phylum", "unassigned")
+        conf = float(res.get("confidence", 0.0))
+        is_unusual = bool(res.get("potentially_unusual", False))
+        rank = res.get("taxonomic_rank", "Phylum")
+
+        # Resolve Kingdom from Phylum
+        kingdom_entry = KINGDOM_MAPPING.get(pred_taxon)
+        kingdom = kingdom_entry[0] if kingdom_entry else "Eukaryota"
+
+        tax = {
+            "kingdom": kingdom,
+            "phylum": pred_taxon if rank == "Phylum" else "unassigned",
+            "class": "unassigned",
+            "order": "unassigned",
+            "family": "unassigned",
+            "genus": "unassigned",
+            "species": "unassigned"
+        }
+
+        # Handle Class-level model (COI XGBoost)
+        if rank == "Class" and pred_taxon in COI_CLASS_MAPPING:
+            coi_info = COI_CLASS_MAPPING[pred_taxon]
+            tax["kingdom"] = coi_info["kingdom"]
+            tax["phylum"] = coi_info["phylum"]
+            tax["class"] = coi_info["class"]
+
+        status = "assigned" if conf >= 0.80 else "low_confidence"
+        novelty = "candidate_novel" if is_unusual else "cataloged"
+
+        return {
+            "taxonomy": tax,
+            "confidence": round(conf, 4),
+            "assignment_status": status,
+            "novelty_status": novelty,
+            "source": res.get("model_id", "ml_model"),
+            "predicted_phylum": tax.get("phylum", "unassigned"),
+            "nearest_distance": res.get("nearest_distance")
+        }
+
+    def predict_batch(self, sequences: List[str], model_id: Optional[str] = "deepdrishti_cnn") -> List[Dict[str, Any]]:
+        """High-throughput batch taxonomic classification across list of sequences."""
+        return [self.resolve_taxonomy(seq, model_id) for seq in sequences]
 
     def predict_all(self, sequence: str) -> Dict[str, Any]:
         """Run inference across all available models and generate comparative analysis."""

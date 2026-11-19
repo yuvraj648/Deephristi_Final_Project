@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 app = FastAPI()
 
@@ -124,6 +124,26 @@ def predict_all_models(request: PredictRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Comparative inference error: {str(e)}")
 
+class BatchPredictRequest(BaseModel):
+    sequences: List[str]
+    model_id: Optional[str] = "deepdrishti_cnn"
+
+BatchPredictRequest.model_rebuild()
+
+@app.post("/predict/batch")
+def predict_batch_sequences(request: BatchPredictRequest):
+    """Batch classify raw DNA sequences into 7-level taxonomy hierarchy."""
+    if not MODELS_LOADED:
+        raise HTTPException(status_code=503, detail="No ML models are loaded.")
+    if not request.sequences:
+        return []
+    try:
+        return manager.predict_batch(request.sequences, request.model_id)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Batch inference error: {str(e)}")
+
 # ============================================================
 # API ENDPOINTS — Expedition CRUD (SQLite-backed)
 # ============================================================
@@ -213,6 +233,16 @@ def compute_expedition_embeddings(exp_id: str):
         row_sum = np.sum(X[i])
         if row_sum > 0:
             X[i] /= row_sum
+
+    if len(asvs) < 2:
+        for a in asvs:
+            a["embedding"] = [0.0, 0.0]
+        exp["asvs"] = asvs
+        serialized = json.dumps(exp, ensure_ascii=False)
+        conn.execute("UPDATE expeditions SET data = ? WHERE id = ?", (serialized, exp_id))
+        conn.commit()
+        conn.close()
+        return {"status": "success", "count": len(asvs), "expedition": exp}
 
     pca = PCA(n_components=2, random_state=42)
     coords = pca.fit_transform(X)

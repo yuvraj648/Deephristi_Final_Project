@@ -9,7 +9,9 @@ echo =====================================================
 echo.
 
 echo [1/2] Starting Python Backend (FastAPI on port 8000)...
-start "DeepDrishti Backend" cmd /k "cd /d "%~dp0MODELS" && python -m uvicorn api:app --host 0.0.0.0 --port 8000 --reload"
+set "PY_CMD=python"
+if exist "C:\Python314\python.exe" set "PY_CMD=C:\Python314\python.exe"
+start "DeepDrishti Backend" cmd /k "cd /d "%~dp0MODELS" && %PY_CMD% -m uvicorn api:app --host 0.0.0.0 --port 8000 --reload"
 
 echo     Waiting 10 seconds for backend to initialize...
 timeout /t 10 /nobreak >nul
