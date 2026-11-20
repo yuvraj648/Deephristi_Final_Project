@@ -11,9 +11,14 @@ import { Dna, Compass, ArrowRight } from 'lucide-react';
 interface LandingPageProps {
   onEnterResearcher: () => void;
   onEnterSurveillance: () => void;
+  onBackToHero?: () => void;
 }
 
-export const LandingPage: React.FC<LandingPageProps> = ({ onEnterResearcher, onEnterSurveillance }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({
+  onEnterResearcher,
+  onEnterSurveillance,
+  onBackToHero,
+}) => {
   return (
     <div className="relative min-h-screen bg-[#0A1218] text-[#E9E6DC] flex flex-col justify-between overflow-hidden select-none">
       {/* Procedurally generated bathymetric contour background lines (8-12% opacity) */}
@@ -45,12 +50,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterResearcher, onE
 
       {/* Top Header Strip */}
       <header className="px-8 pt-12 pb-6 flex items-center justify-between z-10">
-        <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onBackToHero}
+          title={onBackToHero ? 'Return to Intro Experience' : undefined}
+          className={`flex items-center gap-3 text-left ${onBackToHero ? 'hover:opacity-80 transition-opacity cursor-pointer' : ''}`}
+        >
           <BrandMark size={28} inverted={true} />
           <span className="font-serif font-bold text-[18px] tracking-[0.15em] uppercase text-[#E9E6DC]">
             DEEPDRISHTI
           </span>
-        </div>
+        </button>
         <div className="text-[11px] font-mono text-[#7FB2C9]/70 tracking-widest uppercase">
           Marine Monitoring Platform
         </div>

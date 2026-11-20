@@ -357,7 +357,7 @@ export const ResearcherLogin: React.FC<ResearcherLoginProps> = ({
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                         className="w-full bg-[#0E1A2E] border border-white/15 rounded-control px-3 py-2 text-[12px] font-mono text-white placeholder-slate-500 focus:outline-none focus:border-[#38BDF8]"
-                        placeholder="Dr. Asmit Thakur"
+                        placeholder="e.g. Dr. Marine Biologist"
                         required
                       />
                     </div>
@@ -392,7 +392,8 @@ export const ResearcherLogin: React.FC<ResearcherLoginProps> = ({
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           className="w-full bg-[#0E1A2E] border border-white/15 rounded-control pl-9 pr-3 py-2 text-[12px] font-mono text-white placeholder-slate-500 focus:outline-none focus:border-[#38BDF8]"
-                          placeholder="asmit01052005@gmail.com"
+                          placeholder="Enter user email"
+                          autoComplete="email"
                           required
                         />
                       </div>
@@ -600,7 +601,8 @@ export const ResearcherLogin: React.FC<ResearcherLoginProps> = ({
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full bg-[#0E1A2E] border border-white/15 rounded-control pl-9 pr-3 py-2 text-[13px] font-mono text-white placeholder-slate-500 focus:outline-none focus:border-[#38BDF8]"
-                      placeholder="asmit01052005@gmail.com"
+                      placeholder="Enter user email"
+                      autoComplete="username"
                       required
                     />
                   </div>
@@ -617,7 +619,8 @@ export const ResearcherLogin: React.FC<ResearcherLoginProps> = ({
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="w-full bg-[#0E1A2E] border border-white/15 rounded-control pl-9 pr-9 py-2 text-[13px] font-mono text-white placeholder-slate-500 focus:outline-none focus:border-[#38BDF8]"
-                      placeholder="••••••••"
+                      placeholder="Enter password"
+                      autoComplete="current-password"
                       required
                     />
                     <button

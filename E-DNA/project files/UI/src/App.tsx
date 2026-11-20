@@ -3,7 +3,7 @@
 // Manages application state machine: Landing → Auth → Home → Workflow → Scoped Workspace
 // ========================================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AnalysisProvider, useAnalysis } from './context/AnalysisContext';
 import { LandingPage } from './pages/LandingPage';
 import { ResearcherLogin } from './pages/ResearcherLogin';
@@ -62,8 +62,48 @@ type AppScreen =
 const MainAppContent: React.FC = () => {
   const { expedition, setExpedition, loadExpeditionById } = useAnalysis();
 
-  const [screen, setScreen] = useState<AppScreen>('hero');
-  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>('overview');
+  // ── Persist screen & view across page refreshes ──────────────────────────
+  const [screen, setScreenState] = useState<AppScreen>(() => {
+    const saved = (sessionStorage.getItem('dd_screen') || localStorage.getItem('dd_screen')) as AppScreen | null;
+    const restorable: AppScreen[] = [
+      'hero',
+      'landing',
+      'auth',
+      'home',
+      'workspace',
+      'community',
+      'new_expedition',
+      'data_source',
+      'data_config',
+      'processing',
+    ];
+    return saved && restorable.includes(saved) ? saved : 'hero';
+  });
+
+  const setScreen = (s: AppScreen) => {
+    setScreenState(s);
+    try {
+      sessionStorage.setItem('dd_screen', s);
+      localStorage.setItem('dd_screen', s);
+    } catch {
+      // ignore storage errors
+    }
+  };
+
+  const [workspaceView, setWorkspaceViewState] = useState<WorkspaceView>(() => {
+    const saved = (sessionStorage.getItem('dd_workspace_view') || localStorage.getItem('dd_workspace_view')) as WorkspaceView | null;
+    return saved || 'overview';
+  });
+
+  const setWorkspaceView = (view: WorkspaceView) => {
+    setWorkspaceViewState(view);
+    try {
+      sessionStorage.setItem('dd_workspace_view', view);
+      localStorage.setItem('dd_workspace_view', view);
+    } catch {
+      // ignore storage errors
+    }
+  };
   const [researcherAuthMode, setResearcherAuthMode] = useState<'cloud' | 'local'>('local');
   const [researcherProfile, setResearcherProfile] = useState<ResearcherProfile | null>(() => getLocalProfile());
   const [researcherUser, setResearcherUser] = useState<string>(() => {
@@ -159,6 +199,7 @@ const MainAppContent: React.FC = () => {
       <LandingPage
         onEnterResearcher={() => setScreen('auth')}
         onEnterSurveillance={navigateToSurveillance}
+        onBackToHero={() => setScreen('hero')}
       />
     );
   }
